@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, develop]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: ecommerce
+          POSTGRES_PASSWORD: ecommerce
+          POSTGRES_DB: ecommerce_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ecommerce -d ecommerce_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://ecommerce:ecommerce@localhost:5432/ecommerce_test?schema=public
+      REDIS_URL: redis://localhost:6379
+      SWAGGER_ENABLED: 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Extensions are created by the infrastructure image in dev; the CI service
+      # container starts empty, so they are created here instead.
+      - name: Create Postgres extensions
+        run: |
+          PGPASSWORD=ecommerce psql -h localhost -U ecommerce -d ecommerce_test \
+            -c "CREATE EXTENSION IF NOT EXISTS vector; CREATE EXTENSION IF NOT EXISTS pg_trgm; CREATE EXTENSION IF NOT EXISTS unaccent;"
+
+      - run: pnpm prisma:generate
+      - run: pnpm prisma:deploy
+      - run: pnpm prisma:seed
+
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm test:e2e
+
+      # The contract is part of the code review: a controller change that was not
+      # regenerated fails here rather than surprising a frontend team later.
+      - name: Check OpenAPI contract is up to date
+        run: pnpm openapi:check
