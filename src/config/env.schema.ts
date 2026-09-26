@@ -22,6 +22,11 @@ export const envSchema = z.object({
   // Window in which re-presenting a just-used refresh token is treated as a retry
   // (parallel tabs) rather than as theft. 0 disables it — strict rotation.
   REFRESH_REUSE_GRACE_MS: z.coerce.number().int().min(0).default(10_000),
+  // Login throttling. Both scopes apply: per account (an attacker rotating IPs) and
+  // per IP (an attacker spraying many accounts).
+  RATE_LIMIT_LOGIN_PER_EMAIL: z.coerce.number().int().positive().default(5),
+  RATE_LIMIT_AUTH_PER_IP: z.coerce.number().int().positive().default(30),
+
   COOKIE_SECURE: z
     .enum(['true', 'false'])
     .default('false')

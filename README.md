@@ -17,7 +17,7 @@ pnpm start:dev             # http://localhost:3000
 | URL | What |
 |---|---|
 | `/api/v1/health/live` | Liveness — never touches the database |
-| `/api/v1/health/ready` | Readiness — checks the database |
+| `/api/v1/health/ready` | Readiness — checks the database; reports Redis without failing |
 | `/api/v1/storefront/categories` | Public category tree |
 | `/docs` | Swagger UI (disable in production) |
 
@@ -92,6 +92,10 @@ One `User` identity; being a merchant means having a `ShopMember` row (ADR-007).
   token replayed later still kills the family. Tests run with the window disabled.
 - **Authentication is on by default.** `JwtAuthGuard` is global; `@Public()` is the
   opt-out, so a forgotten decorator closes an endpoint instead of exposing one.
+- **Login is throttled** per account (5 attempts / 5 min) and per IP (30 / 5 min),
+  counted in Redis. Both scopes matter: per account stops a slow brute force spread
+  across many IPs, per IP stops one host spraying many accounts. The limit counts
+  *attempts*, so guessing correctly on attempt six is still refused.
 - **Shop access is authorised per request.** The client selects a shop with
   `X-Shop-Id`; `ShopGuard` verifies membership against the database every time, so
   revoking a member takes effect immediately.
@@ -99,7 +103,6 @@ One `User` identity; being a merchant means having a `ShopMember` row (ADR-007).
 ### Known gaps, deliberately
 | Gap | Plan |
 |---|---|
-| No login rate limiting | Needs Redis; lands with the rate-limit module |
 | No password reset | Needs the mail queue; next slice |
 | No email verification | Post-MVP (v1.1) |
 | Suspending a user does not kill live access tokens | Acceptable for a 15-minute window; revisit if it ever isn't |

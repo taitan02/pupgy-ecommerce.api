@@ -1,6 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PrismaService } from '../../infra/prisma/prisma.service.js';
+import { RedisService } from '../../infra/redis/redis.service.js';
 import { logger } from '../../infra/logger/logger.js';
 import { Public } from '../../common/decorators/auth.decorators.js';
 
@@ -8,7 +9,10 @@ import { Public } from '../../common/decorators/auth.decorators.js';
 @ApiTags('health')
 @Controller('health')
 export class HealthController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly redis: RedisService,
+  ) {}
 
   /**
    * Liveness: "is the process alive?" It must not touch dependencies — if a
@@ -38,7 +42,11 @@ export class HealthController {
       checks.database = 'down';
     }
 
-    const healthy = Object.values(checks).every((value) => value === 'ok');
+    // Redis being down degrades the service (rate limiting fails open) but does not
+    // make it unable to serve traffic, so it is reported without failing readiness.
+    checks.redis = (await this.redis.ping()) ? 'ok' : 'down';
+
+    const healthy = checks.database === 'ok';
     return { status: healthy ? 'ok' : 'degraded', checks };
   }
 }

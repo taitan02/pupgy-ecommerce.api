@@ -1,5 +1,5 @@
 import { Body, Controller, Get, HttpCode, Post, Req, Res } from '@nestjs/common';
-import { ApiBody, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiOkResponse, ApiOperation, ApiTags, ApiTooManyRequestsResponse } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
 import { AuthService } from './services/auth.service.js';
@@ -13,6 +13,7 @@ import {
 import { RefreshDto } from './dto/refresh.dto.js';
 import { REFRESH_COOKIE, REFRESH_COOKIE_PATH } from './auth.types.js';
 import { CurrentUser, Public } from '../../common/decorators/auth.decorators.js';
+import { RateLimit } from '../../common/rate-limit/rate-limit.decorator.js';
 import { AppError } from '../../common/errors/app-error.js';
 import { ErrorCode } from '../../common/errors/error-codes.js';
 import type { AuthenticatedUser } from './auth.types.js';
@@ -21,6 +22,9 @@ import type { TokenAudience } from '../../generated/prisma/enums.js';
 import type { Env } from '../../config/env.schema.js';
 
 @ApiTags('auth')
+@ApiTooManyRequestsResponse({
+  description: 'Rate limit exceeded. The Retry-After header says how long to wait.',
+})
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -30,6 +34,7 @@ export class AuthController {
 
   @Post('register')
   @Public()
+  @RateLimit({ name: 'register-ip', limitKey: 'RATE_LIMIT_AUTH_PER_IP', windowSeconds: 300, by: 'ip' })
   @ApiOperation({ summary: 'Create an account and start a session' })
   @ApiOkResponse({ type: AuthResponseDto })
   async register(
@@ -44,6 +49,12 @@ export class AuthController {
 
   @Post('login')
   @Public()
+  // Both scopes: per account stops a slow brute force across many IPs, per IP stops
+  // one host spraying many accounts.
+  @RateLimit(
+    { name: 'login-email', limitKey: 'RATE_LIMIT_LOGIN_PER_EMAIL', windowSeconds: 300, by: 'email' },
+    { name: 'login-ip', limitKey: 'RATE_LIMIT_AUTH_PER_IP', windowSeconds: 300, by: 'ip' },
+  )
   @HttpCode(200)
   @ApiOperation({ summary: 'Exchange credentials for a session' })
   @ApiOkResponse({ type: AuthResponseDto })
@@ -59,6 +70,7 @@ export class AuthController {
 
   @Post('refresh')
   @Public() // authenticated by the refresh cookie, not by an access token
+  @RateLimit({ name: 'refresh-ip', limitKey: 'RATE_LIMIT_AUTH_PER_IP', windowSeconds: 300, by: 'ip' })
   @HttpCode(200)
   @ApiOperation({ summary: 'Rotate the refresh token and issue a new access token' })
   @ApiBody({ type: RefreshDto })

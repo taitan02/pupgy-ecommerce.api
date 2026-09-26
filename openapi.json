@@ -55,6 +55,9 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded. The Retry-After header says how long to wait."
           }
         },
         "summary": "Create an account and start a session",
@@ -87,6 +90,9 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded. The Retry-After header says how long to wait."
           }
         },
         "summary": "Exchange credentials for a session",
@@ -119,6 +125,9 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded. The Retry-After header says how long to wait."
           }
         },
         "summary": "Rotate the refresh token and issue a new access token",
@@ -144,6 +153,9 @@
         "responses": {
           "204": {
             "description": ""
+          },
+          "429": {
+            "description": "Rate limit exceeded. The Retry-After header says how long to wait."
           }
         },
         "summary": "Revoke the session family and clear the cookie",
@@ -166,6 +178,9 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Rate limit exceeded. The Retry-After header says how long to wait."
           }
         },
         "summary": "The authenticated user",
