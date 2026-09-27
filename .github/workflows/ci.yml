@@ -26,9 +26,8 @@ jobs:
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 5s --health-timeout 3s --health-retries 10
-      # MinIO is NOT a service container: the official image needs `server /data` as
-      # its command, and a services block cannot set one. It is started as a step
-      # below instead.
+      # The S3 server is NOT a service container: it needs a command, and a services
+      # block cannot set one. It is started as a step below.
 
     env:
       NODE_ENV: test
@@ -45,8 +44,9 @@ jobs:
       S3_ENDPOINT: http://localhost:9000
       S3_REGION: auto
       S3_BUCKET: ecommerce-test
-      S3_ACCESS_KEY_ID: minioadmin
-      S3_SECRET_ACCESS_KEY: minioadmin
+      # S3Mock ignores credentials, but the SDK insists on having some.
+      S3_ACCESS_KEY_ID: test
+      S3_SECRET_ACCESS_KEY: test
       S3_PUBLIC_BASE_URL: http://localhost:9000/ecommerce-test
 
     steps:
@@ -62,19 +62,24 @@ jobs:
 
       # No separate extension step: `db:test:prepare` recreates the schema and its
       # extensions together, so CI runs exactly what a developer runs.
-      # The image tests upload through a presigned URL to a real S3 API — the same one
-      # Cloudflare R2 serves in production, so mocking it would test nothing.
-      - name: Start MinIO
+      # The image tests upload through a presigned URL to a real S3 server, because
+      # presigning and the post-upload HeadObject check are the whole feature.
+      #
+      # Not MinIO: both minio/minio and quay.io/minio/minio now refuse anonymous
+      # pulls, and bitnami/minio was withdrawn entirely. S3Mock is a real HTTP S3
+      # implementation built for tests, and it does not depend on any vendor's
+      # distribution decisions. Development still runs MinIO (see
+      # ecommerce-infrastructure) — the suite passes against both, which is the
+      # evidence that our code is not tied to one implementation.
+      - name: Start S3 server
         run: |
-          docker run -d --name minio -p 9000:9000 \
-            -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
-            minio/minio:latest server /data
+          docker run -d --name s3 -p 9000:9090 adobe/s3mock:latest
           for _ in $(seq 1 30); do
-            curl -sf http://localhost:9000/minio/health/live && exit 0
+            curl -sf -o /dev/null http://localhost:9000/ && exit 0
             sleep 2
           done
-          echo "MinIO did not become healthy" >&2
-          docker logs minio
+          echo "S3 server did not become healthy" >&2
+          docker logs s3
           exit 1
 
       - run: pnpm prisma:generate
