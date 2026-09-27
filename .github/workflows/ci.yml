@@ -26,17 +26,9 @@ jobs:
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 5s --health-timeout 3s --health-retries 10
-      # The image tests upload through a presigned URL to a real S3 API — the same
-      # one Cloudflare R2 serves in production. Mocking it would test nothing.
-      minio:
-        image: bitnami/minio:latest
-        env:
-          MINIO_ROOT_USER: minioadmin
-          MINIO_ROOT_PASSWORD: minioadmin
-        ports: ['9000:9000']
-        options: >-
-          --health-cmd "mc ready local"
-          --health-interval 10s --health-timeout 5s --health-retries 10
+      # MinIO is NOT a service container: the official image needs `server /data` as
+      # its command, and a services block cannot set one. It is started as a step
+      # below instead.
 
     env:
       NODE_ENV: test
@@ -44,6 +36,9 @@ jobs:
       # file stays useful locally while CI points at its own service containers.
       DATABASE_URL: postgresql://ecommerce:ecommerce@localhost:5432/ecommerce_test?schema=public
       TEST_DATABASE_URL: postgresql://ecommerce:ecommerce@localhost:5432/ecommerce_test?schema=public
+      # prisma.config.ts reads this at load time, so every prisma command needs it
+      # present even when the command itself never uses a shadow database.
+      SHADOW_DATABASE_URL: postgresql://ecommerce:ecommerce@localhost:5432/ecommerce_shadow?schema=public
       # Database 1, matching .env.test: the rate-limit suite flushes it.
       REDIS_URL: redis://localhost:6379/1
       SWAGGER_ENABLED: 'true'
@@ -65,12 +60,22 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # Extensions are created by the infrastructure image in dev; the CI service
-      # container starts empty, so they are created here instead.
-      - name: Create Postgres extensions
+      # No separate extension step: `db:test:prepare` recreates the schema and its
+      # extensions together, so CI runs exactly what a developer runs.
+      # The image tests upload through a presigned URL to a real S3 API — the same one
+      # Cloudflare R2 serves in production, so mocking it would test nothing.
+      - name: Start MinIO
         run: |
-          PGPASSWORD=ecommerce psql -h localhost -U ecommerce -d ecommerce_test \
-            -c "CREATE EXTENSION IF NOT EXISTS vector; CREATE EXTENSION IF NOT EXISTS pg_trgm; CREATE EXTENSION IF NOT EXISTS unaccent;"
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
+            minio/minio:latest server /data
+          for _ in $(seq 1 30); do
+            curl -sf http://localhost:9000/minio/health/live && exit 0
+            sleep 2
+          done
+          echo "MinIO did not become healthy" >&2
+          docker logs minio
+          exit 1
 
       - run: pnpm prisma:generate
 
