@@ -11,3 +11,6 @@ src/generated/
 # Test configuration is shared: it points at the throwaway test database and
 # contains no real secrets, so tests run out of the box on any machine.
 !.env.test
+
+# Incremental build cache
+*.tsbuildinfo

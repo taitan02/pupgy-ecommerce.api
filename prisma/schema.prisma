@@ -95,7 +95,8 @@ model Shop {
   createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  members ShopMember[]
+  members  ShopMember[]
+  products Product[]
 
   @@map("shops")
 }
@@ -135,7 +136,109 @@ model Category {
   // its subtree (and, later, orphan every product listed under it).
   parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
   children Category[] @relation("CategoryTree")
+  products Product[]
 
   @@index([parentId, position])
   @@map("categories")
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  HIDDEN
+  ARCHIVED
+
+  @@map("product_status")
+}
+
+/// A shop's listing. Public once ACTIVE, but the row is shop-private data: every
+/// query that is not the public catalog filters by shop_id (ADR-006).
+model Product {
+  id          String        @id @db.Uuid
+  shopId      String        @map("shop_id") @db.Uuid
+  categoryId  String        @map("category_id") @db.Uuid
+  name        String        @db.VarChar(200)
+  /// Unique per shop, not globally: two shops may both sell "áo thun trắng".
+  slug        String        @db.VarChar(220)
+  description String?       @db.Text
+  status      ProductStatus @default(DRAFT)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  shop     Shop            @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  category Category        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  options  ProductOption[]
+  skus     Sku[]
+
+  @@unique([shopId, slug])
+  // Lets children reference (shop_id, product_id) together, so a child can never
+  // point at another shop's product.
+  @@unique([id, shopId])
+  @@index([shopId, status, createdAt])
+  @@index([categoryId, status])
+  @@map("products")
+}
+
+/// A variation axis, e.g. "Màu sắc". At most two per product (Shopee's model);
+/// enforced in the service, because a count limit is not expressible as a constraint.
+model ProductOption {
+  id        String @id @db.Uuid
+  productId String @map("product_id") @db.Uuid
+  shopId    String @map("shop_id") @db.Uuid
+  name      String @db.VarChar(60)
+  /// 1 or 2: which axis this is. Drives the order shown on the product page.
+  position  Int
+
+  product Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  values  ProductOptionValue[]
+
+  @@unique([productId, position])
+  @@index([shopId])
+  @@map("product_options")
+}
+
+model ProductOptionValue {
+  id       String @id @db.Uuid
+  optionId String @map("option_id") @db.Uuid
+  shopId   String @map("shop_id") @db.Uuid
+  value    String @db.VarChar(60)
+  position Int
+
+  option        ProductOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  skusAsFirst   Sku[]         @relation("SkuOptionValue1")
+  skusAsSecond  Sku[]         @relation("SkuOptionValue2")
+
+  @@unique([optionId, value])
+  @@map("product_option_values")
+}
+
+/// The thing that is actually bought: one combination of option values, with its own
+/// price and stock. A product with no options has exactly one SKU.
+model Sku {
+  id        String @id @db.Uuid
+  productId String @map("product_id") @db.Uuid
+  shopId    String @map("shop_id") @db.Uuid
+  /// Merchant's own code, unique per shop when provided.
+  code      String? @db.VarChar(64)
+  /// Integer VND. There is no minor unit, and floats have no place near money.
+  price     Int
+  stock     Int     @default(0)
+
+  /// Two columns instead of a join table: the product rule caps variations at two
+  /// axes, so "find the SKU for this combination" stays a single WHERE.
+  optionValue1Id String? @map("option_value_1_id") @db.Uuid
+  optionValue2Id String? @map("option_value_2_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  // Composite reference: a SKU cannot belong to another shop's product, whatever
+  // the application layer does (ADR-006).
+  product      Product             @relation(fields: [productId, shopId], references: [id, shopId], onDelete: Cascade)
+  optionValue1 ProductOptionValue? @relation("SkuOptionValue1", fields: [optionValue1Id], references: [id], onDelete: Restrict)
+  optionValue2 ProductOptionValue? @relation("SkuOptionValue2", fields: [optionValue2Id], references: [id], onDelete: Restrict)
+
+  @@unique([shopId, code])
+  @@index([productId])
+  @@map("skus")
 }

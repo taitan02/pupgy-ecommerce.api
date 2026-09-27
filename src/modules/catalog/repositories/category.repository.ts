@@ -19,6 +19,18 @@ export interface CategoryRow {
 export class CategoryRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  async exists(id: string): Promise<boolean> {
+    const category = await this.prisma.category.findFirst({
+      where: { id, isActive: true },
+      select: { id: true },
+    });
+    return category !== null;
+  }
+
+  findBySlug(slug: string): Promise<{ id: string } | null> {
+    return this.prisma.category.findFirst({ where: { slug, isActive: true }, select: { id: true } });
+  }
+
   findAllActive(): Promise<CategoryRow[]> {
     return this.prisma.category.findMany({
       where: { isActive: true },

@@ -28,6 +28,21 @@ export const RequestContext = {
     return storage.getStore()?.requestId;
   },
 
+  /**
+   * The authorised shop for this request, set by ShopGuard. Repositories call this
+   * instead of taking a shop id as an argument: there is no code path where a caller
+   * can choose which shop's data to read (ADR-006).
+   */
+  requireShopId(): string {
+    const shopId = storage.getStore()?.shopId;
+    if (!shopId) {
+      // Reaching here means a seller route is missing ShopGuard. Failing loudly in
+      // development beats silently querying across shops.
+      throw new Error('No shop in request context — is ShopGuard applied to this route?');
+    }
+    return shopId;
+  },
+
   /** Mutates the active store. Only guards should call this. */
   set<K extends keyof RequestContextStore>(key: K, value: RequestContextStore[K]): void {
     const store = storage.getStore();

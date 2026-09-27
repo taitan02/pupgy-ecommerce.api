@@ -107,6 +107,24 @@ One `User` identity; being a merchant means having a `ShopMember` row (ADR-007).
 | No email verification | Post-MVP (v1.1) |
 | Suspending a user does not kill live access tokens | Acceptable for a 15-minute window; revisit if it ever isn't |
 
+## Catalog model (Phase 4)
+
+`Product` → `ProductOption` (≤ 2) → `ProductOptionValue`, and `Sku` as the thing that
+is actually bought: one option combination with its own price and stock.
+
+- **A SKU stores its option values in two columns**, not a join table. Two axes is a
+  product rule (Shopee's model), so "find the SKU for this combination" stays one
+  `WHERE` instead of a `GROUP BY … HAVING COUNT`.
+- **Price and stock live on the SKU.** Listings show a range computed from them.
+- **Constraints the database enforces itself** (see the `add_catalog` migration):
+  non-negative price and stock, `position IN (1,2)`, a composite foreign key so a SKU
+  cannot reference another shop's product, and a unique index on the option
+  combination with `NULLS NOT DISTINCT` — without that, a product with no options
+  could accumulate unlimited duplicate SKUs.
+- **Products are never deleted**, only `ARCHIVED`: orders reference them.
+
+Not yet: editing the option structure after creation, and product images.
+
 ## Contract workflow
 
 1. Change DTOs or controllers.

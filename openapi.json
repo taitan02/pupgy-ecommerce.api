@@ -472,6 +472,359 @@
           "storefront/categories"
         ]
       }
+    },
+    "/api/v1/storefront/products": {
+      "get": {
+        "operationId": "StorefrontProductController_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Id of the last item from the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "categorySlug",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "ao-nam",
+              "type": "string"
+            }
+          },
+          {
+            "name": "shopSlug",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "tai-store",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Browse products across all shops",
+        "tags": [
+          "storefront/products"
+        ]
+      }
+    },
+    "/api/v1/storefront/products/{id}": {
+      "get": {
+        "operationId": "StorefrontProductController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontProductDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Product detail for the product page",
+        "tags": [
+          "storefront/products"
+        ]
+      }
+    },
+    "/api/v1/seller/products": {
+      "post": {
+        "operationId": "SellerProductController_create",
+        "parameters": [
+          {
+            "name": "x-shop-id",
+            "in": "header",
+            "description": "Selected shop; re-authorised per request",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProductDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Create a product with its options and SKUs",
+        "tags": [
+          "seller/products"
+        ]
+      },
+      "get": {
+        "operationId": "SellerProductController_listMine",
+        "parameters": [
+          {
+            "name": "x-shop-id",
+            "in": "header",
+            "description": "Selected shop; re-authorised per request",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Id of the last item from the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "DRAFT",
+                "ACTIVE",
+                "HIDDEN",
+                "ARCHIVED"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List the shop products",
+        "tags": [
+          "seller/products"
+        ]
+      }
+    },
+    "/api/v1/seller/products/{id}": {
+      "get": {
+        "operationId": "SellerProductController_get",
+        "parameters": [
+          {
+            "name": "x-shop-id",
+            "in": "header",
+            "description": "Selected shop; re-authorised per request",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Product detail, including drafts",
+        "tags": [
+          "seller/products"
+        ]
+      },
+      "patch": {
+        "operationId": "SellerProductController_update",
+        "parameters": [
+          {
+            "name": "x-shop-id",
+            "in": "header",
+            "description": "Selected shop; re-authorised per request",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProductDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Update product details or status",
+        "tags": [
+          "seller/products"
+        ]
+      }
+    },
+    "/api/v1/seller/products/{id}/skus/{skuId}": {
+      "patch": {
+        "operationId": "SellerProductController_updateSku",
+        "parameters": [
+          {
+            "name": "x-shop-id",
+            "in": "header",
+            "description": "Selected shop; re-authorised per request",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "skuId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSkuDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Update one SKU price, stock or code",
+        "tags": [
+          "seller/products"
+        ]
+      }
     }
   },
   "info": {
@@ -812,6 +1165,328 @@
           "slug",
           "children"
         ]
+      },
+      "ProductOptionResponseDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Màu sắc"
+          },
+          "values": {
+            "example": [
+              "Đen",
+              "Trắng"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "values"
+        ]
+      },
+      "SkuResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "price": {
+            "type": "number",
+            "example": 150000,
+            "description": "Integer VND"
+          },
+          "stock": {
+            "type": "number",
+            "example": 10
+          },
+          "optionValues": {
+            "example": [
+              "Đen",
+              "M"
+            ],
+            "description": "Option values, in option order",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "price",
+          "stock",
+          "optionValues"
+        ]
+      },
+      "StorefrontProductDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "categoryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "ACTIVE",
+              "HIDDEN",
+              "ARCHIVED"
+            ]
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductOptionResponseDto"
+            }
+          },
+          "skus": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SkuResponseDto"
+            }
+          },
+          "shopName": {
+            "type": "string",
+            "example": "Tai Store"
+          },
+          "shopSlug": {
+            "type": "string",
+            "example": "tai-store"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "description",
+          "categoryId",
+          "status",
+          "options",
+          "skus",
+          "shopName",
+          "shopSlug"
+        ]
+      },
+      "ProductOptionInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Màu sắc"
+          },
+          "values": {
+            "example": [
+              "Đen",
+              "Trắng"
+            ],
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "values"
+        ]
+      },
+      "SkuInput": {
+        "type": "object",
+        "properties": {
+          "optionValues": {
+            "example": [
+              "Đen",
+              "M"
+            ],
+            "description": "One value per option, in option order. Empty for a product with no options.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "price": {
+            "type": "number",
+            "example": 150000,
+            "description": "Integer VND"
+          },
+          "stock": {
+            "type": "number",
+            "example": 10
+          },
+          "code": {
+            "type": "string",
+            "example": "AT-DEN-M",
+            "description": "Merchant's own code, unique per shop"
+          }
+        },
+        "required": [
+          "optionValues",
+          "price",
+          "stock"
+        ]
+      },
+      "CreateProductDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Áo thun basic"
+          },
+          "slug": {
+            "type": "string",
+            "example": "ao-thun-basic",
+            "description": "Unique within the shop"
+          },
+          "categoryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": {
+            "type": "string"
+          },
+          "options": {
+            "maxItems": 2,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductOptionInput"
+            }
+          },
+          "skus": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SkuInput"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "slug",
+          "categoryId",
+          "skus"
+        ]
+      },
+      "ProductDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "categoryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "ACTIVE",
+              "HIDDEN",
+              "ARCHIVED"
+            ]
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductOptionResponseDto"
+            }
+          },
+          "skus": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SkuResponseDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "description",
+          "categoryId",
+          "status",
+          "options",
+          "skus"
+        ]
+      },
+      "UpdateProductDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "ACTIVE",
+              "HIDDEN",
+              "ARCHIVED"
+            ]
+          }
+        }
+      },
+      "UpdateSkuDto": {
+        "type": "object",
+        "properties": {
+          "price": {
+            "type": "number",
+            "example": 160000
+          },
+          "stock": {
+            "type": "number",
+            "example": 25,
+            "description": "Absolute value. Phase 7 adds safe adjustments."
+          },
+          "code": {
+            "type": "string"
+          }
+        }
       }
     }
   }
