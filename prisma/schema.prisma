@@ -169,6 +169,7 @@ model Product {
   category Category        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   options  ProductOption[]
   skus     Sku[]
+  images   ProductImage[]
 
   @@unique([shopId, slug])
   // Lets children reference (shop_id, product_id) together, so a child can never
@@ -239,6 +240,40 @@ model Sku {
   optionValue2 ProductOptionValue? @relation("SkuOptionValue2", fields: [optionValue2Id], references: [id], onDelete: Restrict)
 
   @@unique([shopId, code])
+  // One SKU per option combination.
+  //
+  // Declared here so Prisma owns the index: an index that exists only in migration
+  // SQL is invisible to the schema diff, and the next `migrate dev` drops it. (That
+  // happened once — the SKU-combination test caught it.)
+  //
+  // Prisma 7 cannot express NULLS NOT DISTINCT, so the migration re-creates this
+  // index with that clause under the same name. Without it Postgres treats every
+  // NULL as unique, and a product with no options could accumulate duplicate SKUs.
+  @@unique([productId, optionValue1Id, optionValue2Id], map: "skus_product_option_combination_key")
   @@index([productId])
   @@map("skus")
+}
+
+/// An uploaded product photo. The bytes live in object storage (R2 in production,
+/// MinIO locally); this row is the record of what was uploaded and in what order.
+model ProductImage {
+  id        String @id @db.Uuid
+  productId String @map("product_id") @db.Uuid
+  shopId    String @map("shop_id") @db.Uuid
+  /// Object key, e.g. shops/{shopId}/products/{productId}/{uuid}.jpg. The public URL
+  /// is built from it, so moving bucket or domain does not require a data migration.
+  storageKey  String @unique @map("storage_key") @db.VarChar(400)
+  contentType String @map("content_type") @db.VarChar(80)
+  sizeBytes   Int    @map("size_bytes")
+  alt         String? @db.VarChar(200)
+  /// 0 is the cover image shown in listings.
+  position    Int    @default(0)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  // Same composite reference as SKUs: an image cannot belong to another shop's
+  // product, whatever the application layer does (ADR-006).
+  product Product @relation(fields: [productId, shopId], references: [id, shopId], onDelete: Cascade)
+
+  @@index([productId, position])
+  @@map("product_images")
 }

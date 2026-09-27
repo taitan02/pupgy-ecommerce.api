@@ -27,6 +27,16 @@ export const envSchema = z.object({
   RATE_LIMIT_LOGIN_PER_EMAIL: z.coerce.number().int().positive().default(5),
   RATE_LIMIT_AUTH_PER_IP: z.coerce.number().int().positive().default(30),
 
+  // Object storage. Cloudflare R2 in staging/production, MinIO locally — both speak
+  // the S3 API, so only these values change between environments.
+  S3_ENDPOINT: z.string().min(1),
+  S3_REGION: z.string().default('auto'),
+  S3_BUCKET: z.string().min(1),
+  S3_ACCESS_KEY_ID: z.string().min(1),
+  S3_SECRET_ACCESS_KEY: z.string().min(1),
+  /// Where uploaded files are readable from: the R2 public domain, or MinIO locally.
+  S3_PUBLIC_BASE_URL: z.string().min(1),
+
   COOKIE_SECURE: z
     .enum(['true', 'false'])
     .default('false')

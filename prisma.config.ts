@@ -7,6 +7,9 @@ export default defineConfig({
   schema: 'prisma/schema.prisma',
   datasource: {
     url: env('DATABASE_URL'),
+    // Scratch database used by `migrate dev` and `migrate diff` to replay the
+    // migration history and compare it with the schema. Never the dev database.
+    shadowDatabaseUrl: env('SHADOW_DATABASE_URL'),
   },
   migrations: {
     path: 'prisma/migrations',

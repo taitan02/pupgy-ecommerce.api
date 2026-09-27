@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { ProductImageDto } from './product-image.dto.js';
 
 export class SkuResponseDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
@@ -23,6 +24,8 @@ export class ProductDetailDto {
   @ApiProperty({ enum: ['DRAFT', 'ACTIVE', 'HIDDEN', 'ARCHIVED'] }) status!: string;
   @ApiProperty({ type: [ProductOptionResponseDto] }) options!: ProductOptionResponseDto[];
   @ApiProperty({ type: [SkuResponseDto] }) skus!: SkuResponseDto[];
+  @ApiProperty({ type: [ProductImageDto], description: 'Ordered; the first is the cover' })
+  images!: ProductImageDto[];
 }
 
 /**
@@ -38,6 +41,8 @@ export class ProductListItemDto {
   @ApiProperty({ example: 150_000 }) priceFrom!: number;
   @ApiProperty({ example: 220_000 }) priceTo!: number;
   @ApiProperty({ example: 42, description: 'Sum of stock across SKUs' }) totalStock!: number;
+  @ApiProperty({ nullable: true, type: String }) coverImageUrl!: string | null;
+  @ApiProperty({ nullable: true, type: String }) coverImageAlt!: string | null;
 }
 
 export class StorefrontProductListItemDto extends ProductListItemDto {

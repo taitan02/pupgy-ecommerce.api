@@ -3,6 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { AppConfigModule } from './config/config.module.js';
 import { PrismaModule } from './infra/prisma/prisma.module.js';
 import { RedisModule } from './infra/redis/redis.module.js';
+import { StorageModule } from './infra/storage/storage.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { CatalogModule } from './modules/catalog/catalog.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
@@ -17,6 +18,7 @@ import { RateLimitService } from './common/rate-limit/rate-limit.service.js';
     AppConfigModule,
     PrismaModule,
     RedisModule,
+    StorageModule,
     HealthModule,
     AuthModule,
     ShopsModule,

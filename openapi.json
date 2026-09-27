@@ -825,6 +825,159 @@
           "seller/products"
         ]
       }
+    },
+    "/api/v1/seller/products/{productId}/images/upload-url": {
+      "post": {
+        "operationId": "SellerProductImageController_createUploadUrl",
+        "parameters": [
+          {
+            "name": "x-shop-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUploadUrlDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadUrlResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Get a presigned URL to upload one image",
+        "tags": [
+          "seller/product-images"
+        ]
+      }
+    },
+    "/api/v1/seller/products/{productId}/images": {
+      "post": {
+        "operationId": "SellerProductImageController_register",
+        "parameters": [
+          {
+            "name": "x-shop-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterImageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductImageDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Register an uploaded image after the file has been sent",
+        "tags": [
+          "seller/product-images"
+        ]
+      }
+    },
+    "/api/v1/seller/products/{productId}/images/{imageId}": {
+      "delete": {
+        "operationId": "SellerProductImageController_remove",
+        "parameters": [
+          {
+            "name": "x-shop-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "imageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Remove an image and delete the stored file",
+        "tags": [
+          "seller/product-images"
+        ]
+      }
     }
   },
   "info": {
@@ -1229,6 +1382,34 @@
           "optionValues"
         ]
       },
+      "ProductImageDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "url": {
+            "type": "string",
+            "example": "https://cdn.example.com/shops/…/photo.jpg"
+          },
+          "alt": {
+            "type": "string",
+            "nullable": true
+          },
+          "position": {
+            "type": "number",
+            "example": 0,
+            "description": "0 is the cover image"
+          }
+        },
+        "required": [
+          "id",
+          "url",
+          "alt",
+          "position"
+        ]
+      },
       "StorefrontProductDetailDto": {
         "type": "object",
         "properties": {
@@ -1271,6 +1452,13 @@
               "$ref": "#/components/schemas/SkuResponseDto"
             }
           },
+          "images": {
+            "description": "Ordered; the first is the cover",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductImageDto"
+            }
+          },
           "shopName": {
             "type": "string",
             "example": "Tai Store"
@@ -1289,6 +1477,7 @@
           "status",
           "options",
           "skus",
+          "images",
           "shopName",
           "shopSlug"
         ]
@@ -1434,6 +1623,13 @@
             "items": {
               "$ref": "#/components/schemas/SkuResponseDto"
             }
+          },
+          "images": {
+            "description": "Ordered; the first is the cover",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductImageDto"
+            }
           }
         },
         "required": [
@@ -1444,7 +1640,8 @@
           "categoryId",
           "status",
           "options",
-          "skus"
+          "skus",
+          "images"
         ]
       },
       "UpdateProductDto": {
@@ -1487,6 +1684,66 @@
             "type": "string"
           }
         }
+      },
+      "CreateUploadUrlDto": {
+        "type": "object",
+        "properties": {
+          "contentType": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "image/webp"
+            ]
+          }
+        },
+        "required": [
+          "contentType"
+        ]
+      },
+      "UploadUrlResponseDto": {
+        "type": "object",
+        "properties": {
+          "uploadUrl": {
+            "type": "string",
+            "description": "PUT the file here directly, with the same Content-Type"
+          },
+          "key": {
+            "type": "string",
+            "description": "Send this back when registering the image"
+          },
+          "expiresInSeconds": {
+            "type": "number",
+            "example": 300
+          },
+          "maxBytes": {
+            "type": "number",
+            "example": 5242880,
+            "description": "Larger uploads are rejected on registration"
+          }
+        },
+        "required": [
+          "uploadUrl",
+          "key",
+          "expiresInSeconds",
+          "maxBytes"
+        ]
+      },
+      "RegisterImageDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "The key returned by the upload-url endpoint"
+          },
+          "alt": {
+            "type": "string",
+            "description": "Alt text. Worth filling in: it is read by screen readers and by search engines."
+          }
+        },
+        "required": [
+          "key"
+        ]
       }
     }
   }

@@ -16,6 +16,10 @@ const DETAIL_SELECT = {
     orderBy: { position: 'asc' },
     select: { name: true, values: { orderBy: { position: 'asc' }, select: { id: true, value: true } } },
   },
+  images: {
+    orderBy: { position: 'asc' },
+    select: { id: true, storageKey: true, alt: true, position: true },
+  },
   skus: {
     orderBy: { createdAt: 'asc' },
     select: {
@@ -36,6 +40,9 @@ const LIST_SELECT = {
   status: true,
   shop: { select: { name: true, slug: true } },
   skus: { select: { price: true, stock: true } },
+  // Only the cover: a listing shows one image per product, so fetching the rest
+  // would be payload nobody renders.
+  images: { orderBy: { position: 'asc' }, take: 1, select: { storageKey: true, alt: true } },
 } as const;
 
 export interface CreateProductData {

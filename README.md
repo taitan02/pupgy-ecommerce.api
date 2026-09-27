@@ -32,6 +32,7 @@ pnpm start:dev             # http://localhost:3000
 | `pnpm openapi:generate` | Build, then write `openapi.json` |
 | `pnpm openapi:check` | Fails if `openapi.json` drifts from the code — CI runs this |
 | `pnpm prisma:migrate` / `prisma:seed` / `prisma:studio` | Database |
+| `pnpm db:test:prepare` | Wipes and rebuilds the **test** database (port 5443). `test:e2e` runs it first so every run starts clean |
 
 ## Layout
 
@@ -123,7 +124,37 @@ is actually bought: one option combination with its own price and stock.
   could accumulate unlimited duplicate SKUs.
 - **Products are never deleted**, only `ARCHIVED`: orders reference them.
 
-Not yet: editing the option structure after creation, and product images.
+### Product images
+
+Uploads go **straight to object storage**, not through this API:
+
+1. `POST /seller/products/:id/images/upload-url` returns a presigned PUT URL (5 min).
+2. The browser PUTs the file to that URL.
+3. `POST /seller/products/:id/images` registers it — and this is where the file is
+   actually checked. A presigned PUT **cannot enforce a size limit**, so the API asks
+   storage what landed (`HeadObject`); anything oversized or of the wrong type is
+   deleted and rejected. The key is verified to sit under this shop's prefix.
+
+Storage is the S3 API: **Cloudflare R2** in staging/production, **MinIO** locally.
+Same code, different env values — see the `S3_*` block in `.env.example`.
+
+Not yet: editing the option structure after creation, and image reordering.
+
+### A Prisma trap worth remembering
+
+An index that exists only in hand-written migration SQL is invisible to Prisma's
+schema diff, and **the next `migrate dev` drops it as drift**. That happened to the
+SKU-combination index; the test that inserts a duplicate caught it.
+
+The fix is to declare the index in `schema.prisma` so Prisma owns it, and let the
+migration re-create it with the clause Prisma cannot express (`NULLS NOT DISTINCT`).
+CHECK constraints are safe by contrast — Prisma does not manage them at all.
+
+Verify at any time that migrations and schema agree:
+
+```bash
+pnpm prisma migrate diff --from-migrations prisma/migrations --to-schema prisma/schema.prisma --script
+```
 
 ## Contract workflow
 

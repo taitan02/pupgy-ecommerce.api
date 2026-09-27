@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { v7 as uuidv7 } from 'uuid';
 import { ProductRepository } from '../repositories/product.repository.js';
 import { CategoryRepository } from '../repositories/category.repository.js';
+import { StorageService } from '../../../infra/storage/storage.service.js';
 import { AppError } from '../../../common/errors/app-error.js';
 import { toCursorPage, type CursorPageDto } from '../../../common/dto/cursor-page.dto.js';
 import type { CreateProductDto, UpdateProductDto, UpdateSkuDto } from '../dto/product.dto.js';
@@ -18,6 +19,7 @@ export class ProductService {
   constructor(
     private readonly products: ProductRepository,
     private readonly categories: CategoryRepository,
+    private readonly storage: StorageService,
   ) {}
 
   async create(dto: CreateProductDto): Promise<ProductDetailDto> {
@@ -88,13 +90,13 @@ export class ProductService {
       skus,
     });
 
-    return toDetail(created);
+    return this.toDetail(created);
   }
 
   async getForSeller(productId: string): Promise<ProductDetailDto> {
     const product = await this.products.findForSeller(productId);
     if (!product) throw AppError.notFound('Product not found');
-    return toDetail(product);
+    return this.toDetail(product);
   }
 
   async listForSeller(params: {
@@ -103,7 +105,7 @@ export class ProductService {
     status?: ProductStatus;
   }): Promise<CursorPageDto<ProductListItemDto>> {
     const rows = await this.products.listForSeller(params);
-    return toCursorPage(rows.map(toListItem), params.limit);
+    return toCursorPage(rows.map((row) => this.toListItem(row)), params.limit);
   }
 
   async update(productId: string, dto: UpdateProductDto): Promise<ProductDetailDto> {
@@ -136,7 +138,7 @@ export class ProductService {
     // something the storefront should confirm.
     if (!product) throw AppError.notFound('Product not found');
 
-    return { ...toDetail(product), shopName: product.shop.name, shopSlug: product.shop.slug };
+    return { ...this.toDetail(product), shopName: product.shop.name, shopSlug: product.shop.slug };
   }
 
   async listPublic(params: {
@@ -154,12 +156,66 @@ export class ProductService {
 
     const rows = await this.products.listPublic({ ...params, categoryId });
     const items = rows.map((row) => ({
-      ...toListItem(row),
+      ...this.toListItem(row),
       shopName: row.shop.name,
       shopSlug: row.shop.slug,
     }));
 
     return toCursorPage(items, params.limit);
+  }
+
+  private toDetail(product: ProductRow) {
+    return {
+      id: product.id,
+      name: product.name,
+      slug: product.slug,
+      description: product.description,
+      categoryId: product.categoryId,
+      status: product.status,
+      options: product.options.map((option) => ({
+        name: option.name,
+        values: option.values.map((value) => value.value),
+      })),
+      skus: product.skus.map((sku) => ({
+        id: sku.id,
+        code: sku.code,
+        price: sku.price,
+        stock: sku.stock,
+        optionValues: [sku.optionValue1?.value, sku.optionValue2?.value].filter(
+          (value): value is string => value !== undefined,
+        ),
+      })),
+      images: product.images.map((image) => ({
+        id: image.id,
+        url: this.storage.publicUrl(image.storageKey),
+        alt: image.alt,
+        position: image.position,
+      })),
+    };
+  }
+
+  private toListItem(row: {
+    id: string;
+    name: string;
+    slug: string;
+    status: string;
+    skus: { price: number; stock: number }[];
+    images: { storageKey: string; alt: string | null }[];
+  }) {
+    const prices = row.skus.map((sku) => sku.price);
+    const cover = row.images[0];
+
+    return {
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      status: row.status,
+      priceFrom: Math.min(...prices),
+      priceTo: Math.max(...prices),
+      totalStock: row.skus.reduce((total, sku) => total + sku.stock, 0),
+      coverImageUrl: cover ? this.storage.publicUrl(cover.storageKey) : null,
+      coverImageAlt: cover?.alt ?? null,
+    };
   }
 }
 
@@ -187,6 +243,7 @@ type ProductRow = {
   categoryId: string;
   status: string;
   options: { name: string; values: { value: string }[] }[];
+  images: { id: string; storageKey: string; alt: string | null; position: number }[];
   skus: {
     id: string;
     code: string | null;
@@ -197,45 +254,3 @@ type ProductRow = {
   }[];
 };
 
-function toDetail(product: ProductRow) {
-  return {
-    id: product.id,
-    name: product.name,
-    slug: product.slug,
-    description: product.description,
-    categoryId: product.categoryId,
-    status: product.status,
-    options: product.options.map((option) => ({
-      name: option.name,
-      values: option.values.map((value) => value.value),
-    })),
-    skus: product.skus.map((sku) => ({
-      id: sku.id,
-      code: sku.code,
-      price: sku.price,
-      stock: sku.stock,
-      optionValues: [sku.optionValue1?.value, sku.optionValue2?.value].filter(
-        (value): value is string => value !== undefined,
-      ),
-    })),
-  };
-}
-
-function toListItem(row: {
-  id: string;
-  name: string;
-  slug: string;
-  status: string;
-  skus: { price: number; stock: number }[];
-}) {
-  const prices = row.skus.map((sku) => sku.price);
-  return {
-    id: row.id,
-    name: row.name,
-    slug: row.slug,
-    status: row.status,
-    priceFrom: Math.min(...prices),
-    priceTo: Math.max(...prices),
-    totalStock: row.skus.reduce((total, sku) => total + sku.stock, 0),
-  };
-}
