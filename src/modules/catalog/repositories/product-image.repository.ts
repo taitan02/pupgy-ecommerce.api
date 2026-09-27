@@ -51,6 +51,15 @@ export class ProductImageRepository {
     });
   }
 
+  /** Used when a product is deleted: the rows cascade, the stored files do not. */
+  async listKeysForProduct(productId: string): Promise<string[]> {
+    const images = await this.prisma.productImage.findMany({
+      where: { productId, shopId: RequestContext.requireShopId() },
+      select: { storageKey: true },
+    });
+    return images.map((image) => image.storageKey);
+  }
+
   async delete(imageId: string): Promise<void> {
     await this.prisma.productImage.deleteMany({
       where: { id: imageId, shopId: RequestContext.requireShopId() },

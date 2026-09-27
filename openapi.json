@@ -8,6 +8,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
           }
         },
         "summary": "Liveness probe",
@@ -23,6 +33,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
           }
         },
         "summary": "Readiness probe",
@@ -58,6 +78,16 @@
           },
           "429": {
             "description": "Rate limit exceeded. The Retry-After header says how long to wait."
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
           }
         },
         "summary": "Create an account and start a session",
@@ -93,6 +123,16 @@
           },
           "429": {
             "description": "Rate limit exceeded. The Retry-After header says how long to wait."
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
           }
         },
         "summary": "Exchange credentials for a session",
@@ -128,6 +168,16 @@
           },
           "429": {
             "description": "Rate limit exceeded. The Retry-After header says how long to wait."
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
           }
         },
         "summary": "Rotate the refresh token and issue a new access token",
@@ -156,6 +206,16 @@
           },
           "429": {
             "description": "Rate limit exceeded. The Retry-After header says how long to wait."
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
           }
         },
         "summary": "Revoke the session family and clear the cookie",
@@ -181,6 +241,16 @@
           },
           "429": {
             "description": "Rate limit exceeded. The Retry-After header says how long to wait."
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
           }
         },
         "summary": "The authenticated user",
@@ -213,6 +283,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -238,6 +318,16 @@
                   "items": {
                     "$ref": "#/components/schemas/MyShopDto"
                   }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
                 }
               }
             }
@@ -275,6 +365,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ShopResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
                 }
               }
             }
@@ -322,6 +422,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -358,6 +468,16 @@
                   "items": {
                     "$ref": "#/components/schemas/ShopMemberDto"
                   }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
                 }
               }
             }
@@ -398,6 +518,16 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -435,6 +565,16 @@
         "responses": {
           "204": {
             "description": ""
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -462,6 +602,16 @@
                   "items": {
                     "$ref": "#/components/schemas/CategoryResponseDto"
                   }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
                 }
               }
             }
@@ -517,7 +667,24 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontProductListPageDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
           }
         },
         "summary": "Browse products across all shops",
@@ -546,6 +713,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/StorefrontProductDetailDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
                 }
               }
             }
@@ -588,6 +765,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProductDetailDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
                 }
               }
             }
@@ -639,19 +826,68 @@
             "required": false,
             "in": "query",
             "schema": {
+              "type": "string",
               "enum": [
                 "DRAFT",
                 "ACTIVE",
                 "HIDDEN",
                 "ARCHIVED"
-              ],
+              ]
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Matches the product name or a SKU code",
+            "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "updated",
+              "type": "string",
+              "enum": [
+                "updated",
+                "created",
+                "name"
+              ]
             }
           }
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductListPageDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -660,6 +896,53 @@
           }
         ],
         "summary": "List the shop products",
+        "tags": [
+          "seller/products"
+        ]
+      }
+    },
+    "/api/v1/seller/products/summary": {
+      "get": {
+        "operationId": "SellerProductController_summary",
+        "parameters": [
+          {
+            "name": "x-shop-id",
+            "in": "header",
+            "description": "Selected shop; re-authorised per request",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductSummaryDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Product counts per status, for the list tabs",
         "tags": [
           "seller/products"
         ]
@@ -694,6 +977,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProductDetailDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
                 }
               }
             }
@@ -750,6 +1043,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -758,6 +1061,184 @@
           }
         ],
         "summary": "Update product details or status",
+        "tags": [
+          "seller/products"
+        ]
+      },
+      "delete": {
+        "description": "Archiving (PATCH status=ARCHIVED) is the usual path for anything that has sold.",
+        "operationId": "SellerProductController_remove",
+        "parameters": [
+          {
+            "name": "x-shop-id",
+            "in": "header",
+            "description": "Selected shop; re-authorised per request",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Delete a product permanently",
+        "tags": [
+          "seller/products"
+        ]
+      }
+    },
+    "/api/v1/seller/products/{id}/variations": {
+      "put": {
+        "description": "Sent whole. A SKU whose option combination still exists keeps its id, so carts and orders stay attached to it.",
+        "operationId": "SellerProductController_replaceVariations",
+        "parameters": [
+          {
+            "name": "x-shop-id",
+            "in": "header",
+            "description": "Selected shop; re-authorised per request",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceVariationsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductDetailDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Replace the option groups and the SKU grid",
+        "tags": [
+          "seller/products"
+        ]
+      }
+    },
+    "/api/v1/seller/products/{id}/shipping": {
+      "patch": {
+        "operationId": "SellerProductController_updateShipping",
+        "parameters": [
+          {
+            "name": "x-shop-id",
+            "in": "header",
+            "description": "Selected shop; re-authorised per request",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateShippingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductDetailDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Update weight and dimensions",
         "tags": [
           "seller/products"
         ]
@@ -810,6 +1291,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProductDetailDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
                 }
               }
             }
@@ -867,6 +1358,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -921,6 +1422,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -966,6 +1477,16 @@
         "responses": {
           "204": {
             "description": ""
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1319,6 +1840,113 @@
           "children"
         ]
       },
+      "StorefrontProductListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "ACTIVE",
+              "HIDDEN",
+              "ARCHIVED"
+            ]
+          },
+          "priceFrom": {
+            "type": "number",
+            "example": 150000
+          },
+          "priceTo": {
+            "type": "number",
+            "example": 220000
+          },
+          "totalStock": {
+            "type": "number",
+            "example": 42,
+            "description": "Sum of stock across SKUs"
+          },
+          "skuCount": {
+            "type": "number",
+            "example": 6
+          },
+          "optionNames": {
+            "example": [
+              "Màu sắc",
+              "Size"
+            ],
+            "description": "Option group names, in order",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "coverImageUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "coverImageAlt": {
+            "type": "string",
+            "nullable": true
+          },
+          "shopName": {
+            "type": "string",
+            "example": "Tai Store"
+          },
+          "shopSlug": {
+            "type": "string",
+            "example": "tai-store"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "status",
+          "priceFrom",
+          "priceTo",
+          "totalStock",
+          "skuCount",
+          "optionNames",
+          "updatedAt",
+          "coverImageUrl",
+          "coverImageAlt",
+          "shopName",
+          "shopSlug"
+        ]
+      },
+      "StorefrontProductListPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StorefrontProductListItemDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
       "ProductOptionResponseDto": {
         "type": "object",
         "properties": {
@@ -1372,6 +2000,10 @@
             "items": {
               "type": "string"
             }
+          },
+          "sellable": {
+            "type": "boolean",
+            "description": "False for a combination that exists but is not offered"
           }
         },
         "required": [
@@ -1379,7 +2011,8 @@
           "code",
           "price",
           "stock",
-          "optionValues"
+          "optionValues",
+          "sellable"
         ]
       },
       "ProductImageDto": {
@@ -1459,6 +2092,22 @@
               "$ref": "#/components/schemas/ProductImageDto"
             }
           },
+          "weightGrams": {
+            "type": "number",
+            "nullable": true
+          },
+          "lengthCm": {
+            "type": "number",
+            "nullable": true
+          },
+          "widthCm": {
+            "type": "number",
+            "nullable": true
+          },
+          "heightCm": {
+            "type": "number",
+            "nullable": true
+          },
           "shopName": {
             "type": "string",
             "example": "Tai Store"
@@ -1478,6 +2127,10 @@
           "options",
           "skus",
           "images",
+          "weightGrams",
+          "lengthCm",
+          "widthCm",
+          "heightCm",
           "shopName",
           "shopSlug"
         ]
@@ -1533,6 +2186,11 @@
             "type": "string",
             "example": "AT-DEN-M",
             "description": "Merchant's own code, unique per shop"
+          },
+          "sellable": {
+            "type": "boolean",
+            "default": true,
+            "description": "False for a combination that exists in the grid but is not offered"
           }
         },
         "required": [
@@ -1630,6 +2288,22 @@
             "items": {
               "$ref": "#/components/schemas/ProductImageDto"
             }
+          },
+          "weightGrams": {
+            "type": "number",
+            "nullable": true
+          },
+          "lengthCm": {
+            "type": "number",
+            "nullable": true
+          },
+          "widthCm": {
+            "type": "number",
+            "nullable": true
+          },
+          "heightCm": {
+            "type": "number",
+            "nullable": true
           }
         },
         "required": [
@@ -1641,7 +2315,135 @@
           "status",
           "options",
           "skus",
-          "images"
+          "images",
+          "weightGrams",
+          "lengthCm",
+          "widthCm",
+          "heightCm"
+        ]
+      },
+      "ProductListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "ACTIVE",
+              "HIDDEN",
+              "ARCHIVED"
+            ]
+          },
+          "priceFrom": {
+            "type": "number",
+            "example": 150000
+          },
+          "priceTo": {
+            "type": "number",
+            "example": 220000
+          },
+          "totalStock": {
+            "type": "number",
+            "example": 42,
+            "description": "Sum of stock across SKUs"
+          },
+          "skuCount": {
+            "type": "number",
+            "example": 6
+          },
+          "optionNames": {
+            "example": [
+              "Màu sắc",
+              "Size"
+            ],
+            "description": "Option group names, in order",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "coverImageUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "coverImageAlt": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "status",
+          "priceFrom",
+          "priceTo",
+          "totalStock",
+          "skuCount",
+          "optionNames",
+          "updatedAt",
+          "coverImageUrl",
+          "coverImageAlt"
+        ]
+      },
+      "ProductListPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductListItemDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "ProductSummaryDto": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "number",
+            "example": 4
+          },
+          "draft": {
+            "type": "number",
+            "example": 2
+          },
+          "hidden": {
+            "type": "number",
+            "example": 0
+          },
+          "archived": {
+            "type": "number",
+            "example": 1
+          }
+        },
+        "required": [
+          "active",
+          "draft",
+          "hidden",
+          "archived"
         ]
       },
       "UpdateProductDto": {
@@ -1665,6 +2467,90 @@
               "HIDDEN",
               "ARCHIVED"
             ]
+          }
+        }
+      },
+      "VariationSkuInput": {
+        "type": "object",
+        "properties": {
+          "optionValues": {
+            "example": [
+              "Đen",
+              "M"
+            ],
+            "description": "One value per option, in option order",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "price": {
+            "type": "number",
+            "example": 459000
+          },
+          "stock": {
+            "type": "number",
+            "example": 24
+          },
+          "code": {
+            "type": "string",
+            "example": "AKG-DEN-M"
+          },
+          "sellable": {
+            "type": "boolean",
+            "default": true,
+            "description": "False for a combination that exists in the grid but is not offered"
+          }
+        },
+        "required": [
+          "optionValues",
+          "price",
+          "stock"
+        ]
+      },
+      "ReplaceVariationsDto": {
+        "type": "object",
+        "properties": {
+          "options": {
+            "maxItems": 2,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductOptionInput"
+            }
+          },
+          "skus": {
+            "minItems": 1,
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VariationSkuInput"
+            }
+          }
+        },
+        "required": [
+          "skus"
+        ]
+      },
+      "UpdateShippingDto": {
+        "type": "object",
+        "properties": {
+          "weightGrams": {
+            "type": "number",
+            "example": 650,
+            "description": "Grams"
+          },
+          "lengthCm": {
+            "type": "number",
+            "example": 30,
+            "description": "Centimetres"
+          },
+          "widthCm": {
+            "type": "number",
+            "example": 25
+          },
+          "heightCm": {
+            "type": "number",
+            "example": 4
           }
         }
       },
@@ -1743,6 +2629,52 @@
         },
         "required": [
           "key"
+        ]
+      },
+      "ProblemDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "example": "https://docs.ecommerce.local/errors/conflict"
+          },
+          "title": {
+            "type": "string",
+            "example": "Conflict"
+          },
+          "status": {
+            "type": "number",
+            "example": 409
+          },
+          "detail": {
+            "type": "string",
+            "example": "This shop address is already taken"
+          },
+          "code": {
+            "type": "string",
+            "example": "CONFLICT",
+            "description": "Stable machine code. Branch on this, never on the message text."
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Correlates with the server logs"
+          },
+          "errors": {
+            "description": "Field-level messages, when validation failed",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "detail",
+          "code",
+          "requestId"
         ]
       }
     }

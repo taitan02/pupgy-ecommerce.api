@@ -3,9 +3,13 @@ import { v7 as uuidv7 } from 'uuid';
 import { ProductRepository } from '../repositories/product.repository.js';
 import { CategoryRepository } from '../repositories/category.repository.js';
 import { StorageService } from '../../../infra/storage/storage.service.js';
+import { VariationRepository } from '../repositories/variation.repository.js';
+import { ProductImageRepository } from '../repositories/product-image.repository.js';
+import { planVariations } from './variation-plan.js';
 import { AppError } from '../../../common/errors/app-error.js';
 import { toCursorPage, type CursorPageDto } from '../../../common/dto/cursor-page.dto.js';
 import type { CreateProductDto, UpdateProductDto, UpdateSkuDto } from '../dto/product.dto.js';
+import type { ReplaceVariationsDto, UpdateShippingDto } from '../dto/variation.dto.js';
 import type {
   ProductDetailDto,
   ProductListItemDto,
@@ -20,6 +24,8 @@ export class ProductService {
     private readonly products: ProductRepository,
     private readonly categories: CategoryRepository,
     private readonly storage: StorageService,
+    private readonly variations: VariationRepository,
+    private readonly images: ProductImageRepository,
   ) {}
 
   async create(dto: CreateProductDto): Promise<ProductDetailDto> {
@@ -30,7 +36,9 @@ export class ProductService {
       throw AppError.conflict('A product with this slug already exists in your shop');
     }
 
-    const options = (dto.options ?? []).map((option, index) => ({
+    const plan = planVariations({ options: dto.options ?? [], skus: dto.skus });
+
+    const options = plan.options.map((option, index) => ({
       id: uuidv7(),
       name: option.name,
       position: index + 1,
@@ -41,40 +49,18 @@ export class ProductService {
       })),
     }));
 
-    validateOptions(options);
-
-    // Option values were just given ids in memory; SKUs reference them by name.
-    const valueIdByOptionAndName = options.map(
+    const valueIdByAxis = options.map(
       (option) => new Map(option.values.map((value) => [value.value, value.id])),
     );
 
-    const seenCombinations = new Set<string>();
-    const skus = dto.skus.map((sku) => {
-      if (sku.optionValues.length !== options.length) {
-        throw AppError.conflict(
-          `Each SKU must have exactly ${options.length} option value(s), in option order`,
-        );
-      }
-
-      const valueIds = sku.optionValues.map((value, index) => {
-        const id = valueIdByOptionAndName[index]!.get(value);
-        if (!id) {
-          throw AppError.conflict(`"${value}" is not a value of option "${options[index]!.name}"`);
-        }
-        return id;
-      });
-
-      const combination = valueIds.join('|');
-      if (seenCombinations.has(combination)) {
-        throw AppError.conflict('Two SKUs have the same option combination');
-      }
-      seenCombinations.add(combination);
-
+    const skus = plan.skus.map((sku) => {
+      const valueIds = sku.labels.map((label, index) => valueIdByAxis[index]!.get(label)!);
       return {
         id: uuidv7(),
         price: sku.price,
         stock: sku.stock,
         code: sku.code,
+        isSellable: sku.sellable,
         optionValue1Id: valueIds[0],
         optionValue2Id: valueIds[1],
       };
@@ -103,9 +89,22 @@ export class ProductService {
     cursor?: string;
     limit: number;
     status?: ProductStatus;
+    query?: string;
+    categoryId?: string;
+    sort?: 'updated' | 'created' | 'name';
   }): Promise<CursorPageDto<ProductListItemDto>> {
     const rows = await this.products.listForSeller(params);
     return toCursorPage(rows.map((row) => this.toListItem(row)), params.limit);
+  }
+
+  async summary() {
+    const counts = await this.products.countByStatus();
+    return {
+      active: counts.ACTIVE ?? 0,
+      draft: counts.DRAFT ?? 0,
+      hidden: counts.HIDDEN ?? 0,
+      archived: counts.ARCHIVED ?? 0,
+    };
   }
 
   async update(productId: string, dto: UpdateProductDto): Promise<ProductDetailDto> {
@@ -128,6 +127,43 @@ export class ProductService {
 
     await this.products.updateSku(skuId, dto);
     return this.getForSeller(productId);
+  }
+
+  /**
+   * Replaces the option groups and the SKU grid in one request. SKUs whose
+   * combination still exists keep their ids, because carts and order items point at
+   * them (see VariationRepository).
+   */
+  async replaceVariations(productId: string, dto: ReplaceVariationsDto): Promise<ProductDetailDto> {
+    await this.getForSeller(productId);
+    await this.variations.replace(productId, planVariations({ options: dto.options ?? [], skus: dto.skus }));
+    return this.getForSeller(productId);
+  }
+
+  async updateShipping(productId: string, dto: UpdateShippingDto): Promise<ProductDetailDto> {
+    if (!(await this.products.updateShipping(productId, dto))) {
+      throw AppError.notFound('Product not found');
+    }
+    return this.getForSeller(productId);
+  }
+
+  /**
+   * Permanent delete. Archiving is the usual path — a product that has been ordered
+   * must never disappear — and once orders exist this will refuse with a 409 for
+   * anything referenced by one.
+   */
+  async delete(productId: string): Promise<void> {
+    await this.getForSeller(productId);
+
+    // Rows cascade with the product; the stored files do not, so collect the keys
+    // before the rows are gone.
+    const keys = await this.images.listKeysForProduct(productId);
+
+    if (!(await this.products.delete(productId))) {
+      throw AppError.notFound('Product not found');
+    }
+
+    await Promise.all(keys.map((key) => this.storage.delete(key)));
   }
 
   // ---------- storefront ----------
@@ -176,11 +212,16 @@ export class ProductService {
         name: option.name,
         values: option.values.map((value) => value.value),
       })),
+      weightGrams: product.weightGrams,
+      lengthCm: product.lengthCm,
+      widthCm: product.widthCm,
+      heightCm: product.heightCm,
       skus: product.skus.map((sku) => ({
         id: sku.id,
         code: sku.code,
         price: sku.price,
         stock: sku.stock,
+        sellable: sku.isSellable,
         optionValues: [sku.optionValue1?.value, sku.optionValue2?.value].filter(
           (value): value is string => value !== undefined,
         ),
@@ -199,6 +240,8 @@ export class ProductService {
     name: string;
     slug: string;
     status: string;
+    updatedAt: Date;
+    options: { name: string }[];
     skus: { price: number; stock: number }[];
     images: { storageKey: string; alt: string | null }[];
   }) {
@@ -213,27 +256,15 @@ export class ProductService {
       priceFrom: Math.min(...prices),
       priceTo: Math.max(...prices),
       totalStock: row.skus.reduce((total, sku) => total + sku.stock, 0),
+      skuCount: row.skus.length,
+      optionNames: row.options.map((option) => option.name),
+      updatedAt: row.updatedAt.toISOString(),
       coverImageUrl: cover ? this.storage.publicUrl(cover.storageKey) : null,
       coverImageAlt: cover?.alt ?? null,
     };
   }
 }
 
-function validateOptions(
-  options: { name: string; values: { value: string }[] }[],
-): void {
-  const names = options.map((option) => option.name.trim().toLowerCase());
-  if (new Set(names).size !== names.length) {
-    throw AppError.conflict('Two options have the same name');
-  }
-
-  for (const option of options) {
-    const values = option.values.map((value) => value.value.trim().toLowerCase());
-    if (new Set(values).size !== values.length) {
-      throw AppError.conflict(`Option "${option.name}" has duplicate values`);
-    }
-  }
-}
 
 type ProductRow = {
   id: string;
@@ -243,12 +274,17 @@ type ProductRow = {
   categoryId: string;
   status: string;
   options: { name: string; values: { value: string }[] }[];
+  weightGrams: number | null;
+  lengthCm: number | null;
+  widthCm: number | null;
+  heightCm: number | null;
   images: { id: string; storageKey: string; alt: string | null; position: number }[];
   skus: {
     id: string;
     code: string | null;
     price: number;
     stock: number;
+    isSellable: boolean;
     optionValue1: { value: string } | null;
     optionValue2: { value: string } | null;
   }[];

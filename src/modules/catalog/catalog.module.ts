@@ -9,6 +9,7 @@ import { ProductImageService } from './services/product-image.service.js';
 import { CategoryRepository } from './repositories/category.repository.js';
 import { ProductRepository } from './repositories/product.repository.js';
 import { ProductImageRepository } from './repositories/product-image.repository.js';
+import { VariationRepository } from './repositories/variation.repository.js';
 import { ShopsModule } from '../shops/shops.module.js';
 
 @Module({
@@ -26,6 +27,7 @@ import { ShopsModule } from '../shops/shops.module.js';
     CategoryRepository,
     ProductRepository,
     ProductImageRepository,
+    VariationRepository,
   ],
   // Other modules consume the services, never the repositories — that is what keeps
   // the monolith modular instead of just large.

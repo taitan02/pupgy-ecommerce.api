@@ -8,6 +8,9 @@ export class SkuResponseDto {
   @ApiProperty({ example: 10 }) stock!: number;
   @ApiProperty({ example: ['Đen', 'M'], description: 'Option values, in option order' })
   optionValues!: string[];
+
+  @ApiProperty({ description: 'False for a combination that exists but is not offered' })
+  sellable!: boolean;
 }
 
 export class ProductOptionResponseDto {
@@ -26,6 +29,11 @@ export class ProductDetailDto {
   @ApiProperty({ type: [SkuResponseDto] }) skus!: SkuResponseDto[];
   @ApiProperty({ type: [ProductImageDto], description: 'Ordered; the first is the cover' })
   images!: ProductImageDto[];
+
+  @ApiProperty({ nullable: true, type: Number }) weightGrams!: number | null;
+  @ApiProperty({ nullable: true, type: Number }) lengthCm!: number | null;
+  @ApiProperty({ nullable: true, type: Number }) widthCm!: number | null;
+  @ApiProperty({ nullable: true, type: Number }) heightCm!: number | null;
 }
 
 /**
@@ -41,6 +49,10 @@ export class ProductListItemDto {
   @ApiProperty({ example: 150_000 }) priceFrom!: number;
   @ApiProperty({ example: 220_000 }) priceTo!: number;
   @ApiProperty({ example: 42, description: 'Sum of stock across SKUs' }) totalStock!: number;
+  @ApiProperty({ example: 6 }) skuCount!: number;
+  @ApiProperty({ example: ['Màu sắc', 'Size'], description: 'Option group names, in order' })
+  optionNames!: string[];
+  @ApiProperty({ format: 'date-time' }) updatedAt!: string;
   @ApiProperty({ nullable: true, type: String }) coverImageUrl!: string | null;
   @ApiProperty({ nullable: true, type: String }) coverImageAlt!: string | null;
 }
@@ -53,4 +65,27 @@ export class StorefrontProductListItemDto extends ProductListItemDto {
 export class StorefrontProductDetailDto extends ProductDetailDto {
   @ApiProperty({ example: 'Tai Store' }) shopName!: string;
   @ApiProperty({ example: 'tai-store' }) shopSlug!: string;
+}
+
+/**
+ * Concrete page shapes. A generic CursorPageDto<T> is invisible to Swagger — the
+ * contract would describe the endpoint as returning nothing, and the generated
+ * client would type the response as `never`.
+ */
+export class ProductListPageDto {
+  @ApiProperty({ type: [ProductListItemDto] }) items!: ProductListItemDto[];
+  @ApiProperty({ nullable: true, type: String }) nextCursor!: string | null;
+}
+
+export class StorefrontProductListPageDto {
+  @ApiProperty({ type: [StorefrontProductListItemDto] }) items!: StorefrontProductListItemDto[];
+  @ApiProperty({ nullable: true, type: String }) nextCursor!: string | null;
+}
+
+/** Tab counters for the product list screen. */
+export class ProductSummaryDto {
+  @ApiProperty({ example: 4 }) active!: number;
+  @ApiProperty({ example: 2 }) draft!: number;
+  @ApiProperty({ example: 0 }) hidden!: number;
+  @ApiProperty({ example: 1 }) archived!: number;
 }

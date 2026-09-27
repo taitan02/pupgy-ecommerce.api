@@ -4,7 +4,7 @@ import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 /** Formats a browser can display and a merchant is likely to have. */
 export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-export const MAX_IMAGES_PER_PRODUCT = 8;
+export const MAX_IMAGES_PER_PRODUCT = 9;
 
 export class CreateUploadUrlDto {
   @ApiProperty({ enum: ALLOWED_IMAGE_TYPES })

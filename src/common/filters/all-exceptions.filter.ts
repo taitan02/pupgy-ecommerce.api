@@ -73,6 +73,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
       };
     }
 
+    const prisma = asPrismaError(exception);
+    if (prisma) return prisma;
+
     // Anything unrecognised is a bug. Never leak its message or stack to the client.
     return {
       status: 500,
@@ -99,5 +102,41 @@ export class AllExceptionsFilter implements ExceptionFilter {
       default:
         return ErrorCode.INTERNAL;
     }
+  }
+}
+
+/**
+ * Database constraint violations are the user's problem, not a server fault: a
+ * duplicate SKU code is a 409 the merchant can act on, and letting it fall through as
+ * a 500 hides that from them (and fills the error tracker with noise).
+ */
+function asPrismaError(exception: unknown) {
+  const code = (exception as { code?: unknown } | null)?.code;
+  if (typeof code !== 'string') return undefined;
+
+  switch (code) {
+    case 'P2002': // unique constraint
+      return {
+        status: 409,
+        code: ErrorCode.CONFLICT,
+        title: 'Conflict',
+        detail: 'A record with these values already exists.',
+      };
+    case 'P2003': // foreign key constraint
+      return {
+        status: 409,
+        code: ErrorCode.CONFLICT,
+        title: 'Conflict',
+        detail: 'This record is referenced by something else.',
+      };
+    case 'P2025': // record not found
+      return {
+        status: 404,
+        code: ErrorCode.NOT_FOUND,
+        title: 'Not Found',
+        detail: 'Resource not found.',
+      };
+    default:
+      return undefined;
   }
 }

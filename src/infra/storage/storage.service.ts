@@ -5,6 +5,7 @@ import {
   DeleteObjectCommand,
   HeadBucketCommand,
   HeadObjectCommand,
+  PutBucketPolicyCommand,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
@@ -53,14 +54,55 @@ export class StorageService implements OnModuleInit {
 
     try {
       await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
+      return;
     } catch {
-      try {
-        await this.client.send(new CreateBucketCommand({ Bucket: this.bucket }));
-        logger.info({ bucket: this.bucket }, 'created storage bucket');
-      } catch (error) {
-        logger.warn({ err: error, bucket: this.bucket }, 'could not ensure storage bucket exists');
-      }
+      // Missing, so create it below.
     }
+
+    try {
+      await this.client.send(new CreateBucketCommand({ Bucket: this.bucket }));
+      logger.info({ bucket: this.bucket }, 'created storage bucket');
+    } catch (error) {
+      logger.error({ err: error, bucket: this.bucket }, 'could not create storage bucket');
+      return;
+    }
+
+    // Reported separately from the bucket itself: not every S3 implementation
+    // supports bucket policies (S3Mock, used in CI, does not), and saying the bucket
+    // failed when only the policy did sends you looking in the wrong place.
+    try {
+      await this.allowPublicReads();
+    } catch (error) {
+      logger.warn(
+        { err: error, bucket: this.bucket },
+        'bucket policy not applied — uploaded images may not be publicly readable',
+      );
+    }
+  }
+
+  /**
+   * Product photos are public: the storefront renders them straight from
+   * S3_PUBLIC_BASE_URL. On Cloudflare R2 that is the bucket's public domain, set once
+   * in the dashboard; MinIO starts private, so development would silently show broken
+   * images without this.
+   */
+  private async allowPublicReads(): Promise<void> {
+    await this.client.send(
+      new PutBucketPolicyCommand({
+        Bucket: this.bucket,
+        Policy: JSON.stringify({
+          Version: '2012-10-17',
+          Statement: [
+            {
+              Effect: 'Allow',
+              Principal: { AWS: ['*'] },
+              Action: ['s3:GetObject'],
+              Resource: [`arn:aws:s3:::${this.bucket}/*`],
+            },
+          ],
+        }),
+      }),
+    );
   }
 
   /** A short-lived URL the browser can PUT the file to directly. */

@@ -4,6 +4,7 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsEnum,
   IsInt,
   IsOptional,
@@ -69,12 +70,20 @@ export class SkuInput {
   @IsString()
   @MaxLength(64)
   code?: string;
+
+  @ApiPropertyOptional({
+    default: true,
+    description: 'False for a combination that exists in the grid but is not offered',
+  })
+  @IsOptional()
+  @IsBoolean()
+  sellable?: boolean;
 }
 
 export class CreateProductDto {
   @ApiProperty({ example: 'Áo thun basic' })
   @IsString()
-  @Length(2, 200)
+  @Length(2, 120)
   name!: string;
 
   @ApiProperty({ example: 'ao-thun-basic', description: 'Unique within the shop' })
@@ -114,7 +123,7 @@ export class UpdateProductDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  @Length(2, 200)
+  @Length(2, 120)
   name?: string;
 
   @ApiPropertyOptional()

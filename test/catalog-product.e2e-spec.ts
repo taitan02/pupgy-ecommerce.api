@@ -292,6 +292,16 @@ describe('Catalog products (e2e)', () => {
     });
 
     it('paginates with a cursor', async () => {
+      // Publishes its own second product: test files run in parallel against one
+      // database, so relying on rows another file happens to create is a race.
+      const second = await createProduct(alice, shopA, productPayload()).expect(201);
+      await request(app.getHttpServer())
+        .patch(url(`/seller/products/${second.body.id}`))
+        .set('Authorization', `Bearer ${alice.accessToken}`)
+        .set('x-shop-id', shopA)
+        .send({ status: 'ACTIVE' })
+        .expect(200);
+
       const firstPage = await request(app.getHttpServer())
         .get(url('/storefront/products'))
         .query({ limit: 1 })

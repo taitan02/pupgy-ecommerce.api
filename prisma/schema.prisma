@@ -162,6 +162,13 @@ model Product {
   slug        String        @db.VarChar(220)
   description String?       @db.Text
   status      ProductStatus @default(DRAFT)
+
+  // Shipping dimensions, used later to price delivery. Nullable because a draft is
+  // saved long before the merchant has weighed anything.
+  weightGrams Int? @map("weight_grams")
+  lengthCm    Int? @map("length_cm")
+  widthCm     Int? @map("width_cm")
+  heightCm    Int? @map("height_cm")
   createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -224,6 +231,9 @@ model Sku {
   /// Integer VND. There is no minor unit, and floats have no place near money.
   price     Int
   stock     Int     @default(0)
+  /// A combination that exists in the grid but is not offered — the storefront
+  /// strikes it through rather than hiding it, so shoppers see why it is unavailable.
+  isSellable Boolean @default(true) @map("is_sellable")
 
   /// Two columns instead of a join table: the product rule caps variations at two
   /// axes, so "find the SKU for this combination" stays a single WHERE.
