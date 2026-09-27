@@ -28,7 +28,7 @@
     "openapi:generate": "nest build && node dist/scripts/generate-openapi.js",
     "openapi:check": "pnpm openapi:generate && git diff --exit-code openapi.json",
     "typecheck": "tsc --noEmit",
-    "db:test:prepare": "DATABASE_URL=\"postgresql://ecommerce:ecommerce@localhost:5443/ecommerce_test?schema=public\" prisma migrate deploy && DATABASE_URL=\"postgresql://ecommerce:ecommerce@localhost:5443/ecommerce_test?schema=public\" tsx prisma/seed/index.ts"
+    "db:test:prepare": "export DATABASE_URL=${TEST_DATABASE_URL:-postgresql://ecommerce:ecommerce@localhost:5443/ecommerce_test?schema=public}; prisma migrate deploy && tsx prisma/seed/index.ts"
   },
   "dependencies": {
     "@nestjs/bullmq": "^12.0.0",
