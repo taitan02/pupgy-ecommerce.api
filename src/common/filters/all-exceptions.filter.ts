@@ -28,7 +28,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       .status(status)
       .type('application/problem+json')
       .json({
-        type: `https://docs.ecommerce.local/errors/${code.toLowerCase()}`,
+        type: `https://docs.pupgy.dev/errors/${code.toLowerCase()}`,
         title,
         status,
         detail,

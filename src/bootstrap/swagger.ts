@@ -4,9 +4,9 @@ import { ProblemDto } from '../common/dto/problem.dto.js';
 
 export function buildOpenApiDocument(app: INestApplication): OpenAPIObject {
   const config = new DocumentBuilder()
-    .setTitle('Ecommerce Marketplace API')
+    .setTitle('Pupgy API')
     .setDescription(
-      'Contract between ecommerce-api and its consumers (storefront, admin). ' +
+      'Contract between the Pupgy API and its consumers (storefront, admin). ' +
         'Additive changes only within v1 — see docs/api/versioning.md.',
     )
     .setVersion('1.0.0')

@@ -39,6 +39,15 @@ export class SellerProductQueryDto extends CursorQueryDto {
 }
 
 export class StorefrontProductQueryDto extends CursorQueryDto {
+  @ApiPropertyOptional({
+    example: 'ao khoac',
+    description: 'Accent-insensitive: "ao khoac" matches "Áo khoác"',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  q?: string;
+
   @ApiPropertyOptional({ example: 'ao-nam' })
   @IsOptional()
   @IsString()

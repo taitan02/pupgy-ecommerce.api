@@ -32,6 +32,15 @@ export class ShopRepository {
     return this.prisma.shop.findUnique({ where: { slug }, select: SHOP_FIELDS });
   }
 
+  listActive(limit: number): Promise<{ slug: string; updatedAt: Date }[]> {
+    return this.prisma.shop.findMany({
+      where: { status: 'ACTIVE' },
+      orderBy: { updatedAt: 'desc' },
+      take: limit,
+      select: { slug: true, updatedAt: true },
+    });
+  }
+
   /**
    * Creating a shop and its owner membership is one transaction: a shop with no owner
    * would be unreachable by anyone, including the person who just created it.

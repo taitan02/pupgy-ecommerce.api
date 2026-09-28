@@ -8,7 +8,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
  * handling stops type-checking.
  */
 export class ProblemDto {
-  @ApiProperty({ example: 'https://docs.ecommerce.local/errors/conflict' })
+  @ApiProperty({ example: 'https://docs.pupgy.dev/errors/conflict' })
   type!: string;
 
   @ApiProperty({ example: 'Conflict' })

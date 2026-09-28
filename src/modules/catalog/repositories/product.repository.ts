@@ -223,6 +223,52 @@ export class ProductRepository {
     });
   }
 
+  /**
+   * Ids matching a Vietnamese search, accent-insensitive in both directions: the
+   * query and the stored name both go through f_unaccent, so "ao khoac" finds
+   * "Áo khoác" and vice versa.
+   *
+   * Raw SQL because Prisma cannot express a function call in a WHERE clause. Ordering
+   * stays id DESC rather than by relevance so search shares the one cursor model;
+   * ranking can come later, measured.
+   */
+  async searchPublicIds(params: { query: string; cursor?: string; limit: number }): Promise<string[]> {
+    const pattern = `%${params.query.trim()}%`;
+
+    const rows = await this.prisma.$queryRaw<{ id: string }[]>`
+      SELECT p.id
+      FROM products p
+      JOIN shops s ON s.id = p.shop_id
+      WHERE p.status = 'ACTIVE'
+        AND s.status = 'ACTIVE'
+        AND f_unaccent(p.name) ILIKE f_unaccent(${pattern})
+        AND (${params.cursor ?? null}::uuid IS NULL OR p.id < ${params.cursor ?? null}::uuid)
+      ORDER BY p.id DESC
+      LIMIT ${params.limit + 1}
+    `;
+
+    return rows.map((row) => row.id);
+  }
+
+  listPublicByIds(ids: string[]) {
+    return this.prisma.product.findMany({
+      where: { id: { in: ids } },
+      orderBy: { id: 'desc' },
+      select: LIST_SELECT,
+    });
+  }
+
+
+  /** Ids and slugs for the sitemap. Deliberately minimal: this runs over every row. */
+  listPublicForSitemap(limit: number) {
+    return this.prisma.product.findMany({
+      where: { status: 'ACTIVE', shop: { status: 'ACTIVE' } },
+      orderBy: { updatedAt: 'desc' },
+      take: limit,
+      select: { id: true, slug: true, updatedAt: true, shop: { select: { slug: true } } },
+    });
+  }
+
   listPublic(params: { cursor?: string; limit: number; categoryId?: string; shopSlug?: string }) {
     return this.prisma.product.findMany({
       where: {

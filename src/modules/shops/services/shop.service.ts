@@ -57,6 +57,19 @@ export class ShopService {
     }));
   }
 
+  /** Only ACTIVE shops exist as far as the storefront is concerned. */
+  async getPublicBySlug(slug: string) {
+    const shop = await this.shops.findBySlug(slug);
+    if (!shop || shop.status !== 'ACTIVE') throw AppError.notFound('Shop not found');
+
+    return { id: shop.id, name: shop.name, slug: shop.slug, description: shop.description };
+  }
+
+  /** Shops for the sitemap. */
+  listPublicForSitemap(limit = 5000) {
+    return this.shops.listActive(limit);
+  }
+
   async getById(shopId: string): Promise<ShopRecord> {
     const shop = await this.shops.findById(shopId);
     if (!shop) throw AppError.notFound('Shop not found');

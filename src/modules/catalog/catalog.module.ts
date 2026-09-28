@@ -3,6 +3,7 @@ import { StorefrontCategoryController } from './controllers/storefront-category.
 import { StorefrontProductController } from './controllers/storefront-product.controller.js';
 import { SellerProductController } from './controllers/seller-product.controller.js';
 import { SellerProductImageController } from './controllers/seller-product-image.controller.js';
+import { StorefrontSitemapController } from './controllers/storefront-sitemap.controller.js';
 import { CategoryService } from './services/category.service.js';
 import { ProductService } from './services/product.service.js';
 import { ProductImageService } from './services/product-image.service.js';
@@ -19,6 +20,7 @@ import { ShopsModule } from '../shops/shops.module.js';
     StorefrontProductController,
     SellerProductController,
     SellerProductImageController,
+    StorefrontSitemapController,
   ],
   providers: [
     CategoryService,

@@ -168,6 +168,11 @@ export class ProductService {
 
   // ---------- storefront ----------
 
+  /** Products for the sitemap: id, slug and last change, nothing else. */
+  listForSitemap(limit = 5000) {
+    return this.products.listPublicForSitemap(limit);
+  }
+
   async getPublic(productId: string): Promise<StorefrontProductDetailDto> {
     const product = await this.products.findPublic(productId);
     // A DRAFT or HIDDEN product is 404 to the public, not 403: its existence is not
@@ -182,6 +187,7 @@ export class ProductService {
     limit: number;
     categorySlug?: string;
     shopSlug?: string;
+    q?: string;
   }): Promise<CursorPageDto<StorefrontProductListItemDto>> {
     let categoryId: string | undefined;
     if (params.categorySlug) {
@@ -190,7 +196,12 @@ export class ProductService {
       categoryId = category.id;
     }
 
-    const rows = await this.products.listPublic({ ...params, categoryId });
+    const query = params.q?.trim();
+    const rows = query
+      ? await this.products.listPublicByIds(
+          await this.products.searchPublicIds({ query, cursor: params.cursor, limit: params.limit }),
+        )
+      : await this.products.listPublic({ ...params, categoryId });
     const items = rows.map((row) => ({
       ...this.toListItem(row),
       shopName: row.shop.name,

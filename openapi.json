@@ -588,6 +588,47 @@
         ]
       }
     },
+    "/api/v1/storefront/shops/{slug}": {
+      "get": {
+        "operationId": "StorefrontShopController_get",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontShopDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Public shop profile",
+        "tags": [
+          "storefront/shops"
+        ]
+      }
+    },
     "/api/v1/storefront/categories": {
       "get": {
         "operationId": "StorefrontCategoryController_getTree",
@@ -644,6 +685,16 @@
               "maximum": 100,
               "default": 20,
               "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Accent-insensitive: \"ao khoac\" matches \"Áo khoác\"",
+            "schema": {
+              "example": "ao khoac",
+              "type": "string"
             }
           },
           {
@@ -1499,11 +1550,43 @@
           "seller/product-images"
         ]
       }
+    },
+    "/api/v1/storefront/sitemap": {
+      "get": {
+        "operationId": "StorefrontSitemapController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SitemapDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Indexable URLs with their last change",
+        "tags": [
+          "storefront/sitemap"
+        ]
+      }
     }
   },
   "info": {
-    "title": "Ecommerce Marketplace API",
-    "description": "Contract between ecommerce-api and its consumers (storefront, admin). Additive changes only within v1 — see docs/api/versioning.md.",
+    "title": "Pupgy API",
+    "description": "Contract between the Pupgy API and its consumers (storefront, admin). Additive changes only within v1 — see docs/api/versioning.md.",
     "version": "1.0.0",
     "contact": {}
   },
@@ -1807,6 +1890,31 @@
         "required": [
           "email",
           "role"
+        ]
+      },
+      "StorefrontShopDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "description"
         ]
       },
       "CategoryResponseDto": {
@@ -2631,12 +2739,56 @@
           "key"
         ]
       },
+      "SitemapEntryDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "url",
+          "updatedAt"
+        ]
+      },
+      "SitemapDto": {
+        "type": "object",
+        "properties": {
+          "products": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SitemapEntryDto"
+            }
+          },
+          "shops": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SitemapEntryDto"
+            }
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SitemapEntryDto"
+            }
+          }
+        },
+        "required": [
+          "products",
+          "shops",
+          "categories"
+        ]
+      },
       "ProblemDto": {
         "type": "object",
         "properties": {
           "type": {
             "type": "string",
-            "example": "https://docs.ecommerce.local/errors/conflict"
+            "example": "https://docs.pupgy.dev/errors/conflict"
           },
           "title": {
             "type": "string",

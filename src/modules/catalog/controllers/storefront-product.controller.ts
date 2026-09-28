@@ -30,6 +30,7 @@ export class StorefrontProductController {
       limit: query.limit,
       categorySlug: query.categorySlug,
       shopSlug: query.shopSlug,
+      q: query.q,
     });
   }
 
