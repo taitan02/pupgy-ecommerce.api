@@ -53,6 +53,8 @@ model User {
 
   sessions    Session[]
   memberships ShopMember[]
+  addresses   Address[]
+  cartItems   CartItem[]
 
   @@map("users")
 }
@@ -248,8 +250,12 @@ model Sku {
   product      Product             @relation(fields: [productId, shopId], references: [id, shopId], onDelete: Cascade)
   optionValue1 ProductOptionValue? @relation("SkuOptionValue1", fields: [optionValue1Id], references: [id], onDelete: Restrict)
   optionValue2 ProductOptionValue? @relation("SkuOptionValue2", fields: [optionValue2Id], references: [id], onDelete: Restrict)
+  cartItems    CartItem[]
 
   @@unique([shopId, code])
+  // Lets a cart line reference (sku_id, shop_id) together, so the shop a line is
+  // grouped under cannot drift from the shop that actually sells the SKU.
+  @@unique([id, shopId])
   // One SKU per option combination.
   //
   // Declared here so Prisma owns the index: an index that exists only in migration
@@ -286,4 +292,66 @@ model ProductImage {
 
   @@index([productId, position])
   @@map("product_images")
+}
+
+
+/// A delivery address in the buyer's address book.
+///
+/// Vietnam dropped the district level on 1 July 2025, so an address is
+/// province → ward → street, not province → district → ward. The codes are
+/// nullable because the official administrative-unit dataset is not loaded yet;
+/// the names are what the shop actually ships to, and they are stored here rather
+/// than resolved from a dataset so a later renaming cannot rewrite history.
+model Address {
+  id            String  @id @db.Uuid
+  userId        String  @map("user_id") @db.Uuid
+  recipientName String  @map("recipient_name") @db.VarChar(120)
+  phone         String  @db.VarChar(20)
+  provinceCode  String? @map("province_code") @db.VarChar(16)
+  provinceName  String  @map("province_name") @db.VarChar(120)
+  wardCode      String? @map("ward_code") @db.VarChar(16)
+  wardName      String  @map("ward_name") @db.VarChar(120)
+  streetLine    String  @map("street_line") @db.VarChar(200)
+  /// Buyer's own note: "Nhà riêng", "Văn phòng".
+  label         String? @db.VarChar(40)
+  /// Pre-selected at checkout. Exactly one per user, kept true in a transaction
+  /// (Prisma 7 cannot declare the partial unique index that would enforce it, and an
+  /// index that lives only in migration SQL gets dropped by the next `migrate dev`).
+  isDefault Boolean  @default(false) @map("is_default")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("addresses")
+}
+
+/// One line of the buyer's cart. There is no Cart row: the user is the cart, which
+/// removes a lifecycle (create, expire, merge) that buys nothing while carts are
+/// account-only.
+///
+/// `shop_id` is stored rather than joined through the SKU because the cart is read
+/// grouped by shop on every page load, and the composite reference below makes the
+/// denormalisation safe.
+model CartItem {
+  id       String @id @db.Uuid
+  userId   String @map("user_id") @db.Uuid
+  shopId   String @map("shop_id") @db.Uuid
+  skuId    String @map("sku_id") @db.Uuid
+  quantity Int
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Cascade: a SKU that no longer exists cannot be priced or shipped, so the line
+  // goes with it. A SKU that still exists but is no longer on sale is a different
+  // case — the line stays and the cart marks it unavailable.
+  sku  Sku  @relation(fields: [skuId, shopId], references: [id, shopId], onDelete: Cascade)
+
+  /// Adding the same SKU twice increases the quantity instead of creating a second line.
+  @@unique([userId, skuId])
+  @@index([userId, shopId])
+  @@map("cart_items")
 }

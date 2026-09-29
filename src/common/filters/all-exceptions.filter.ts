@@ -16,7 +16,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const response = host.switchToHttp().getResponse<Response>();
     const requestId = RequestContext.requestId();
 
-    const { status, code, title, detail, errors } = this.normalise(exception);
+    const { status, code, title, detail, errors, extensions } = this.normalise(exception);
 
     if (status >= 500) {
       logger.error({ err: exception, code }, 'unhandled error');
@@ -28,6 +28,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
       .status(status)
       .type('application/problem+json')
       .json({
+        // Extension members first, so a problem can add context (RFC 9457 §3.2) but
+        // never overwrite the members every client relies on.
+        ...extensions,
         type: `https://docs.pupgy.dev/errors/${code.toLowerCase()}`,
         title,
         status,
@@ -44,6 +47,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     title: string;
     detail: string;
     errors?: unknown;
+    extensions?: Record<string, unknown>;
   } {
     if (exception instanceof AppError) {
       return {
@@ -51,7 +55,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         code: exception.code,
         title: exception.message,
         detail: exception.message,
-        errors: exception.details,
+        extensions: exception.extensions,
       };
     }
 

@@ -31,4 +31,12 @@ export class ProblemDto {
 
   @ApiPropertyOptional({ description: 'Field-level messages, when validation failed' })
   errors?: string[];
+
+  // RFC 9457 extension member. Extension members belong to one problem type rather
+  // than to every error, and they are declared here so generated clients can read
+  // them without casting.
+  @ApiPropertyOptional({
+    description: 'On a cart stock conflict: how many the shop can actually ship',
+  })
+  availableStock?: number;
 }
