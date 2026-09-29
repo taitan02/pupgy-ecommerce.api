@@ -55,6 +55,7 @@ model User {
   memberships ShopMember[]
   addresses   Address[]
   cartItems   CartItem[]
+  orders      Order[]
 
   @@map("users")
 }
@@ -99,6 +100,7 @@ model Shop {
 
   members  ShopMember[]
   products Product[]
+  orders   Order[]
 
   @@map("shops")
 }
@@ -251,6 +253,8 @@ model Sku {
   optionValue1 ProductOptionValue? @relation("SkuOptionValue1", fields: [optionValue1Id], references: [id], onDelete: Restrict)
   optionValue2 ProductOptionValue? @relation("SkuOptionValue2", fields: [optionValue2Id], references: [id], onDelete: Restrict)
   cartItems    CartItem[]
+  orderItems   OrderItem[]
+  movements    InventoryMovement[]
 
   @@unique([shopId, code])
   // Lets a cart line reference (sku_id, shop_id) together, so the shop a line is
@@ -354,4 +358,162 @@ model CartItem {
   @@unique([userId, skuId])
   @@index([userId, shopId])
   @@map("cart_items")
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  SHIPPING
+  DELIVERED
+  CANCELLED
+
+  @@map("order_status")
+}
+
+enum PaymentMethod {
+  COD
+  SEPAY_QR
+
+  @@map("payment_method")
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+
+  @@map("payment_status")
+}
+
+enum CancelledBy {
+  BUYER
+  SELLER
+
+  @@map("cancelled_by")
+}
+
+enum InventoryReason {
+  ORDER_PLACED
+  ORDER_CANCELLED
+
+  @@map("inventory_reason")
+}
+
+/// One shop's part of a checkout (ADR-012). Three shops in a cart means three orders:
+/// each ships its own parcel and is paid directly, so there is nothing for a parent
+/// row to hold that would be true of all of them.
+///
+/// The address and the totals are copies, not references. An order is a record of what
+/// was agreed, and editing an address or a price must not rewrite it.
+model Order {
+  id     String @id @db.Uuid
+  /// What a buyer reads out to the shop. Short, unambiguous, and not the primary key,
+  /// because a key that is printed on a parcel is a key people will try to guess.
+  code   String @unique @db.VarChar(20)
+  shopId String @map("shop_id") @db.Uuid
+  buyerId String @map("buyer_id") @db.Uuid
+
+  status        OrderStatus   @default(PENDING)
+  paymentMethod PaymentMethod @map("payment_method")
+  paymentStatus PaymentStatus @default(UNPAID) @map("payment_status")
+
+  recipientName String  @map("recipient_name") @db.VarChar(120)
+  phone         String  @db.VarChar(20)
+  provinceName  String  @map("province_name") @db.VarChar(120)
+  wardName      String  @map("ward_name") @db.VarChar(120)
+  streetLine    String  @map("street_line") @db.VarChar(200)
+  /// Buyer's message to the shop ("giao giờ hành chính").
+  note          String? @db.VarChar(500)
+
+  /// Integer VND. Stored rather than summed on read: the lines can be recomputed, the
+  /// agreed total cannot.
+  itemsSubtotal Int @map("items_subtotal")
+  shippingFee   Int @map("shipping_fee")
+  total         Int
+
+  placedAt    DateTime  @default(now()) @map("placed_at") @db.Timestamptz(3)
+  confirmedAt DateTime? @map("confirmed_at") @db.Timestamptz(3)
+  shippedAt   DateTime? @map("shipped_at") @db.Timestamptz(3)
+  deliveredAt DateTime? @map("delivered_at") @db.Timestamptz(3)
+  cancelledAt DateTime? @map("cancelled_at") @db.Timestamptz(3)
+
+  cancelledBy  CancelledBy? @map("cancelled_by")
+  cancelReason String?      @map("cancel_reason") @db.VarChar(200)
+
+  /// Client-generated, one per checkout attempt. A resubmitted form hits this unique
+  /// index and gets the first order back instead of placing a second one.
+  idempotencyKey String? @map("idempotency_key") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  shop  Shop @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  buyer User @relation(fields: [buyerId], references: [id], onDelete: Restrict)
+
+  items     OrderItem[]
+  movements InventoryMovement[]
+
+  @@unique([buyerId, idempotencyKey])
+  // Same composite trick as products: lets a line reference (order_id, shop_id)
+  // together, so a line can never be filed under a different shop than its order.
+  @@unique([id, shopId])
+  // The seller's list: one shop, optionally one status, newest first. Ids are UUIDv7,
+  // so ordering by id is ordering by time and the cursor needs no second column.
+  @@index([shopId, status, id])
+  @@index([buyerId, id])
+  @@map("orders")
+}
+
+/// A line as it was bought. Every field the buyer sees is a copy; `sku_id` is kept for
+/// stock accounting and restocking, under RESTRICT so a sold variation cannot be
+/// deleted out from under it (ADR-012).
+model OrderItem {
+  id      String @id @db.Uuid
+  orderId String @map("order_id") @db.Uuid
+  shopId  String @map("shop_id") @db.Uuid
+  skuId   String @map("sku_id") @db.Uuid
+
+  productId   String @map("product_id") @db.Uuid
+  productName String @map("product_name") @db.VarChar(200)
+  /// Snapshotted with the name so an order line links to the product without reading
+  /// the catalog. A later rename still resolves: the id decides which product is
+  /// served and the page redirects to the current spelling.
+  productSlug String @map("product_slug") @db.VarChar(220)
+  /// Rendered as "Đen / L". Empty for a product without variations.
+  optionValues String[] @map("option_values")
+  /// The image key at the time of purchase, so the thumbnail survives a re-upload.
+  imageKey    String? @map("image_key") @db.VarChar(400)
+
+  unitPrice Int @map("unit_price")
+  quantity  Int
+  lineTotal Int @map("line_total")
+
+  order Order @relation(fields: [orderId, shopId], references: [id, shopId], onDelete: Cascade)
+  sku   Sku   @relation(fields: [skuId, shopId], references: [id, shopId], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([skuId])
+  @@map("order_items")
+}
+
+/// Every stock change, with the reason and the order behind it. Without it, `stock` is
+/// a number that moves for reasons nobody recorded, and a disputed count has no answer.
+model InventoryMovement {
+  id      String  @id @db.Uuid
+  shopId  String  @map("shop_id") @db.Uuid
+  skuId   String  @map("sku_id") @db.Uuid
+  orderId String? @map("order_id") @db.Uuid
+  /// Negative when stock leaves, positive when it comes back.
+  delta   Int
+  reason  InventoryReason
+  /// Stock after this movement, as the transaction saw it. Lets the ledger be checked
+  /// against the SKU without replaying every row.
+  stockAfter Int @map("stock_after")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  sku   Sku    @relation(fields: [skuId, shopId], references: [id, shopId], onDelete: Restrict)
+  order Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([skuId, id])
+  @@index([shopId, id])
+  @@map("inventory_movements")
 }

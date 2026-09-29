@@ -1583,54 +1583,16 @@
         ]
       }
     },
-    "/api/v1/storefront/addresses": {
-      "get": {
-        "operationId": "StorefrontAddressController_list",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/AddressDto"
-                  }
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "access-token": []
-          }
-        ],
-        "summary": "The caller's address book, default first",
-        "tags": [
-          "storefront/addresses"
-        ]
-      },
+    "/api/v1/storefront/checkout/preview": {
       "post": {
-        "operationId": "StorefrontAddressController_create",
+        "operationId": "StorefrontOrderController_preview",
         "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateAddressDto"
+                "$ref": "#/components/schemas/CheckoutPreviewDto"
               }
             }
           }
@@ -1641,7 +1603,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AddressDto"
+                  "$ref": "#/components/schemas/CheckoutQuoteDto"
                 }
               }
             }
@@ -1662,15 +1624,181 @@
             "access-token": []
           }
         ],
-        "summary": "Save a delivery address",
+        "summary": "Price one shop’s cart lines, live, before ordering",
         "tags": [
-          "storefront/addresses"
+          "storefront/orders"
         ]
       }
     },
-    "/api/v1/storefront/addresses/{id}": {
-      "patch": {
-        "operationId": "StorefrontAddressController_update",
+    "/api/v1/storefront/orders": {
+      "post": {
+        "operationId": "StorefrontOrderController_place",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlaceOrderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaceOrderResultDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A line sold out or went off sale; `items` says which and why"
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Place the order for one shop and take its stock",
+        "tags": [
+          "storefront/orders"
+        ]
+      },
+      "get": {
+        "operationId": "StorefrontOrderController_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Id of the last item from the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "CONFIRMED",
+                "SHIPPING",
+                "DELIVERED",
+                "CANCELLED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderListPageDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "The buyer’s own orders, newest first",
+        "tags": [
+          "storefront/orders"
+        ]
+      }
+    },
+    "/api/v1/storefront/orders/{id}": {
+      "get": {
+        "operationId": "StorefrontOrderController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "One order",
+        "tags": [
+          "storefront/orders"
+        ]
+      }
+    },
+    "/api/v1/storefront/orders/{id}/cancel": {
+      "post": {
+        "operationId": "StorefrontOrderController_cancel",
         "parameters": [
           {
             "name": "id",
@@ -1686,7 +1814,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateAddressDto"
+                "$ref": "#/components/schemas/CancelOrderDto"
               }
             }
           }
@@ -1697,7 +1825,91 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AddressDto"
+                  "$ref": "#/components/schemas/OrderDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Too late — the shop has already confirmed"
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Cancel, while the shop has not confirmed yet",
+        "tags": [
+          "storefront/orders"
+        ]
+      }
+    },
+    "/api/v1/seller/orders": {
+      "get": {
+        "operationId": "SellerOrderController_list",
+        "parameters": [
+          {
+            "name": "x-shop-id",
+            "in": "header",
+            "description": "Selected shop; re-authorised per request",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Id of the last item from the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "CONFIRMED",
+                "SHIPPING",
+                "DELIVERED",
+                "CANCELLED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderListPageDto"
                 }
               }
             }
@@ -1718,14 +1930,72 @@
             "access-token": []
           }
         ],
-        "summary": "Update an address",
+        "summary": "The shop’s orders, newest first",
         "tags": [
-          "storefront/addresses"
+          "seller/orders"
         ]
-      },
-      "delete": {
-        "operationId": "StorefrontAddressController_remove",
+      }
+    },
+    "/api/v1/seller/orders/summary": {
+      "get": {
+        "operationId": "SellerOrderController_summary",
         "parameters": [
+          {
+            "name": "x-shop-id",
+            "in": "header",
+            "description": "Selected shop; re-authorised per request",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderSummaryDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Counts per status, for the tabs",
+        "tags": [
+          "seller/orders"
+        ]
+      }
+    },
+    "/api/v1/seller/orders/{id}": {
+      "get": {
+        "operationId": "SellerOrderController_get",
+        "parameters": [
+          {
+            "name": "x-shop-id",
+            "in": "header",
+            "description": "Selected shop; re-authorised per request",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "name": "id",
             "required": true,
@@ -1736,8 +2006,15 @@
           }
         ],
         "responses": {
-          "204": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDto"
+                }
+              }
+            }
           },
           "default": {
             "description": "Request failed. RFC 9457 problem document with a stable `code`.",
@@ -1755,9 +2032,245 @@
             "access-token": []
           }
         ],
-        "summary": "Delete an address; the default moves to the next one",
+        "summary": "One order",
         "tags": [
-          "storefront/addresses"
+          "seller/orders"
+        ]
+      }
+    },
+    "/api/v1/seller/orders/{id}/confirm": {
+      "post": {
+        "operationId": "SellerOrderController_confirm",
+        "parameters": [
+          {
+            "name": "x-shop-id",
+            "in": "header",
+            "description": "Selected shop; re-authorised per request",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The order is no longer pending"
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Accept the order and start preparing it",
+        "tags": [
+          "seller/orders"
+        ]
+      }
+    },
+    "/api/v1/seller/orders/{id}/ship": {
+      "post": {
+        "operationId": "SellerOrderController_ship",
+        "parameters": [
+          {
+            "name": "x-shop-id",
+            "in": "header",
+            "description": "Selected shop; re-authorised per request",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Hand the parcel to the courier",
+        "tags": [
+          "seller/orders"
+        ]
+      }
+    },
+    "/api/v1/seller/orders/{id}/deliver": {
+      "post": {
+        "operationId": "SellerOrderController_deliver",
+        "parameters": [
+          {
+            "name": "x-shop-id",
+            "in": "header",
+            "description": "Selected shop; re-authorised per request",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Mark delivered; COD is collected at this point",
+        "tags": [
+          "seller/orders"
+        ]
+      }
+    },
+    "/api/v1/seller/orders/{id}/cancel": {
+      "post": {
+        "operationId": "SellerOrderController_cancel",
+        "parameters": [
+          {
+            "name": "x-shop-id",
+            "in": "header",
+            "description": "Selected shop; re-authorised per request",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelOrderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already shipped — cancelling is a return, not a cancel"
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Refuse the order and give the stock back",
+        "tags": [
+          "seller/orders"
         ]
       }
     },
@@ -1982,6 +2495,184 @@
         "summary": "Remove a line",
         "tags": [
           "storefront/cart"
+        ]
+      }
+    },
+    "/api/v1/storefront/addresses": {
+      "get": {
+        "operationId": "StorefrontAddressController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AddressDto"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "The caller's address book, default first",
+        "tags": [
+          "storefront/addresses"
+        ]
+      },
+      "post": {
+        "operationId": "StorefrontAddressController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAddressDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddressDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Save a delivery address",
+        "tags": [
+          "storefront/addresses"
+        ]
+      }
+    },
+    "/api/v1/storefront/addresses/{id}": {
+      "patch": {
+        "operationId": "StorefrontAddressController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAddressDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddressDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Update an address",
+        "tags": [
+          "storefront/addresses"
+        ]
+      },
+      "delete": {
+        "operationId": "StorefrontAddressController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Delete an address; the default moves to the next one",
+        "tags": [
+          "storefront/addresses"
         ]
       }
     }
@@ -3185,121 +3876,615 @@
           "categories"
         ]
       },
-      "AddressDto": {
+      "CheckoutPreviewDto": {
+        "type": "object",
+        "properties": {
+          "shopId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The cart group being checked out"
+          },
+          "addressId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Defaults to the default address"
+          }
+        },
+        "required": [
+          "shopId"
+        ]
+      },
+      "CheckoutLineDto": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string",
             "format": "uuid"
           },
-          "recipientName": {
-            "type": "string"
+          "skuId": {
+            "type": "string",
+            "format": "uuid"
           },
-          "phone": {
-            "type": "string"
+          "productId": {
+            "type": "string",
+            "format": "uuid"
           },
-          "provinceName": {
-            "type": "string"
+          "productName": {
+            "type": "string",
+            "description": "The name as it was when the order was placed"
           },
-          "wardName": {
-            "type": "string"
+          "productSlug": {
+            "type": "string",
+            "description": "For the link back to the product page"
           },
-          "streetLine": {
-            "type": "string"
+          "optionValues": {
+            "example": [
+              "Đen",
+              "L"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
-          "label": {
+          "imageUrl": {
             "type": "string",
             "nullable": true
           },
-          "isDefault": {
-            "type": "boolean"
+          "unitPrice": {
+            "type": "number",
+            "example": 150000
           },
-          "formatted": {
+          "quantity": {
+            "type": "number"
+          },
+          "lineTotal": {
+            "type": "number"
+          },
+          "availableStock": {
+            "type": "number",
+            "description": "What the shop can ship right now"
+          },
+          "issue": {
             "type": "string",
-            "example": "128/4 Trần Quốc Thảo, Phường Võ Thị Sáu, TP. Hồ Chí Minh",
-            "description": "The address on one line, formatted once here so every client agrees"
+            "enum": [
+              "INSUFFICIENT_STOCK",
+              "OUT_OF_STOCK",
+              "UNAVAILABLE"
+            ],
+            "nullable": true
           }
         },
         "required": [
           "id",
-          "recipientName",
-          "phone",
-          "provinceName",
-          "wardName",
-          "streetLine",
-          "label",
-          "isDefault",
-          "formatted"
+          "skuId",
+          "productId",
+          "productName",
+          "productSlug",
+          "optionValues",
+          "imageUrl",
+          "unitPrice",
+          "quantity",
+          "lineTotal",
+          "availableStock",
+          "issue"
         ]
       },
-      "CreateAddressDto": {
+      "OrderAddressDto": {
         "type": "object",
         "properties": {
           "recipientName": {
-            "type": "string",
-            "example": "Nguyễn Minh Tài"
+            "type": "string"
           },
           "phone": {
-            "type": "string",
-            "example": "0912345678",
-            "description": "10 digits, starting with 0"
+            "type": "string"
           },
-          "provinceName": {
+          "formatted": {
             "type": "string",
-            "example": "TP. Hồ Chí Minh"
-          },
-          "wardName": {
-            "type": "string",
-            "example": "Phường Võ Thị Sáu"
-          },
-          "streetLine": {
-            "type": "string",
-            "example": "128/4 Trần Quốc Thảo"
-          },
-          "label": {
-            "type": "string",
-            "example": "Nhà riêng",
-            "maxLength": 40
-          },
-          "isDefault": {
-            "type": "boolean",
-            "description": "Pre-select this address at checkout"
+            "description": "Street, ward, province — ready to print on a label"
           }
         },
         "required": [
           "recipientName",
           "phone",
-          "provinceName",
-          "wardName",
-          "streetLine"
+          "formatted"
         ]
       },
-      "UpdateAddressDto": {
+      "CheckoutQuoteDto": {
         "type": "object",
         "properties": {
-          "recipientName": {
-            "type": "string"
-          },
-          "phone": {
-            "type": "string"
-          },
-          "provinceName": {
-            "type": "string"
-          },
-          "wardName": {
-            "type": "string"
-          },
-          "streetLine": {
-            "type": "string"
-          },
-          "label": {
+          "shopId": {
             "type": "string",
-            "maxLength": 40
+            "format": "uuid"
           },
-          "isDefault": {
-            "type": "boolean"
+          "shopName": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CheckoutLineDto"
+            }
+          },
+          "address": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OrderAddressDto"
+              }
+            ]
+          },
+          "addressId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "itemsSubtotal": {
+            "type": "number"
+          },
+          "shippingFee": {
+            "type": "number",
+            "description": "Flat per-order fee until shops have a pickup address (ADR-012)"
+          },
+          "total": {
+            "type": "number"
+          },
+          "paymentMethods": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "COD",
+                "SEPAY_QR"
+              ]
+            }
+          },
+          "blocked": {
+            "type": "boolean",
+            "description": "True when a line or the address needs fixing first"
+          }
+        },
+        "required": [
+          "shopId",
+          "shopName",
+          "items",
+          "address",
+          "addressId",
+          "itemsSubtotal",
+          "shippingFee",
+          "total",
+          "paymentMethods",
+          "blocked"
+        ]
+      },
+      "PlaceOrderDto": {
+        "type": "object",
+        "properties": {
+          "shopId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "addressId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "COD"
+            ],
+            "default": "COD"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Buyer message to the shop"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Generated by the client once per checkout attempt. Resubmitting the same key returns the order already placed instead of placing a second one."
+          }
+        },
+        "required": [
+          "shopId",
+          "addressId",
+          "paymentMethod",
+          "idempotencyKey"
+        ]
+      },
+      "OrderItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "skuId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "productId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "productName": {
+            "type": "string",
+            "description": "The name as it was when the order was placed"
+          },
+          "productSlug": {
+            "type": "string",
+            "description": "For the link back to the product page"
+          },
+          "optionValues": {
+            "example": [
+              "Đen",
+              "L"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "imageUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "unitPrice": {
+            "type": "number",
+            "example": 150000
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "lineTotal": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "skuId",
+          "productId",
+          "productName",
+          "productSlug",
+          "optionValues",
+          "imageUrl",
+          "unitPrice",
+          "quantity",
+          "lineTotal"
+        ]
+      },
+      "OrderDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "example": "PG260929-K4M2XQ"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "CONFIRMED",
+              "SHIPPING",
+              "DELIVERED",
+              "CANCELLED"
+            ]
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "COD",
+              "SEPAY_QR"
+            ]
+          },
+          "paymentStatus": {
+            "type": "string",
+            "enum": [
+              "UNPAID",
+              "PAID"
+            ]
+          },
+          "total": {
+            "type": "number"
+          },
+          "itemCount": {
+            "type": "number",
+            "description": "Units across all lines"
+          },
+          "firstItem": {
+            "description": "For the thumbnail and \"và N sản phẩm khác\"",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OrderItemDto"
+              }
+            ]
+          },
+          "shopId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "shopName": {
+            "type": "string"
+          },
+          "shopSlug": {
+            "type": "string"
+          },
+          "buyerName": {
+            "type": "string"
+          },
+          "placedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "allowedTransitions": {
+            "type": "array",
+            "description": "States the caller may move this order to right now. Drives the buttons.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "CONFIRMED",
+                "SHIPPING",
+                "DELIVERED",
+                "CANCELLED"
+              ]
+            }
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderItemDto"
+            }
+          },
+          "address": {
+            "$ref": "#/components/schemas/OrderAddressDto"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "itemsSubtotal": {
+            "type": "number"
+          },
+          "shippingFee": {
+            "type": "number"
+          },
+          "cancelledBy": {
+            "type": "string",
+            "enum": [
+              "BUYER",
+              "SELLER"
+            ],
+            "nullable": true
+          },
+          "cancelReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "confirmedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "shippedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "deliveredAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "cancelledAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "status",
+          "paymentMethod",
+          "paymentStatus",
+          "total",
+          "itemCount",
+          "firstItem",
+          "shopId",
+          "shopName",
+          "shopSlug",
+          "buyerName",
+          "placedAt",
+          "allowedTransitions",
+          "items",
+          "address",
+          "note",
+          "itemsSubtotal",
+          "shippingFee",
+          "cancelledBy",
+          "cancelReason",
+          "confirmedAt",
+          "shippedAt",
+          "deliveredAt",
+          "cancelledAt"
+        ]
+      },
+      "PlaceOrderResultDto": {
+        "type": "object",
+        "properties": {
+          "order": {
+            "$ref": "#/components/schemas/OrderDto"
+          },
+          "remainingCartItems": {
+            "type": "number",
+            "description": "Lines still in the cart, across all shops"
+          }
+        },
+        "required": [
+          "order",
+          "remainingCartItems"
+        ]
+      },
+      "OrderListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "example": "PG260929-K4M2XQ"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "CONFIRMED",
+              "SHIPPING",
+              "DELIVERED",
+              "CANCELLED"
+            ]
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "COD",
+              "SEPAY_QR"
+            ]
+          },
+          "paymentStatus": {
+            "type": "string",
+            "enum": [
+              "UNPAID",
+              "PAID"
+            ]
+          },
+          "total": {
+            "type": "number"
+          },
+          "itemCount": {
+            "type": "number",
+            "description": "Units across all lines"
+          },
+          "firstItem": {
+            "description": "For the thumbnail and \"và N sản phẩm khác\"",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OrderItemDto"
+              }
+            ]
+          },
+          "shopId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "shopName": {
+            "type": "string"
+          },
+          "shopSlug": {
+            "type": "string"
+          },
+          "buyerName": {
+            "type": "string"
+          },
+          "placedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "allowedTransitions": {
+            "type": "array",
+            "description": "States the caller may move this order to right now. Drives the buttons.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "CONFIRMED",
+                "SHIPPING",
+                "DELIVERED",
+                "CANCELLED"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "status",
+          "paymentMethod",
+          "paymentStatus",
+          "total",
+          "itemCount",
+          "firstItem",
+          "shopId",
+          "shopName",
+          "shopSlug",
+          "buyerName",
+          "placedAt",
+          "allowedTransitions"
+        ]
+      },
+      "OrderListPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderListItemDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "CancelOrderDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 200
           }
         }
+      },
+      "OrderSummaryDto": {
+        "type": "object",
+        "properties": {
+          "pending": {
+            "type": "number"
+          },
+          "confirmed": {
+            "type": "number"
+          },
+          "shipping": {
+            "type": "number"
+          },
+          "delivered": {
+            "type": "number"
+          },
+          "cancelled": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "pending",
+          "confirmed",
+          "shipping",
+          "delivered",
+          "cancelled"
+        ]
       },
       "CartItemDto": {
         "type": "object",
@@ -3476,6 +4661,122 @@
         "required": [
           "quantity"
         ]
+      },
+      "AddressDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "recipientName": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "provinceName": {
+            "type": "string"
+          },
+          "wardName": {
+            "type": "string"
+          },
+          "streetLine": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "formatted": {
+            "type": "string",
+            "example": "128/4 Trần Quốc Thảo, Phường Võ Thị Sáu, TP. Hồ Chí Minh",
+            "description": "The address on one line, formatted once here so every client agrees"
+          }
+        },
+        "required": [
+          "id",
+          "recipientName",
+          "phone",
+          "provinceName",
+          "wardName",
+          "streetLine",
+          "label",
+          "isDefault",
+          "formatted"
+        ]
+      },
+      "CreateAddressDto": {
+        "type": "object",
+        "properties": {
+          "recipientName": {
+            "type": "string",
+            "example": "Nguyễn Minh Tài"
+          },
+          "phone": {
+            "type": "string",
+            "example": "0912345678",
+            "description": "10 digits, starting with 0"
+          },
+          "provinceName": {
+            "type": "string",
+            "example": "TP. Hồ Chí Minh"
+          },
+          "wardName": {
+            "type": "string",
+            "example": "Phường Võ Thị Sáu"
+          },
+          "streetLine": {
+            "type": "string",
+            "example": "128/4 Trần Quốc Thảo"
+          },
+          "label": {
+            "type": "string",
+            "example": "Nhà riêng",
+            "maxLength": 40
+          },
+          "isDefault": {
+            "type": "boolean",
+            "description": "Pre-select this address at checkout"
+          }
+        },
+        "required": [
+          "recipientName",
+          "phone",
+          "provinceName",
+          "wardName",
+          "streetLine"
+        ]
+      },
+      "UpdateAddressDto": {
+        "type": "object",
+        "properties": {
+          "recipientName": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "provinceName": {
+            "type": "string"
+          },
+          "wardName": {
+            "type": "string"
+          },
+          "streetLine": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "isDefault": {
+            "type": "boolean"
+          }
+        }
       },
       "ProblemDto": {
         "type": "object",

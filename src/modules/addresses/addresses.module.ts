@@ -6,6 +6,6 @@ import { AddressRepository } from './repositories/address.repository.js';
 @Module({
   controllers: [StorefrontAddressController],
   providers: [AddressService, AddressRepository],
-  exports: [AddressService],
+  exports: [AddressService, AddressRepository],
 })
 export class AddressesModule {}

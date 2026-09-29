@@ -12,9 +12,12 @@ import { ProductRepository } from './repositories/product.repository.js';
 import { ProductImageRepository } from './repositories/product-image.repository.js';
 import { VariationRepository } from './repositories/variation.repository.js';
 import { ShopsModule } from '../shops/shops.module.js';
+import { OrdersModule } from '../orders/orders.module.js';
 
 @Module({
-  imports: [ShopsModule], // ShopGuard needs ShopMemberRepository
+  // ShopsModule: ShopGuard needs ShopMemberRepository. OrdersModule: a product that
+  // has been sold cannot be deleted.
+  imports: [ShopsModule, OrdersModule],
   controllers: [
     StorefrontCategoryController,
     StorefrontProductController,

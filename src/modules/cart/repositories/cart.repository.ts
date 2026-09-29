@@ -67,6 +67,15 @@ export class CartRepository {
     });
   }
 
+  /** One shop's lines, for checkout: an order is placed against a shop, not a cart. */
+  listForShop(userId: string, shopId: string): Promise<CartLineRow[]> {
+    return this.prisma.cartItem.findMany({
+      where: { userId, shopId },
+      orderBy: { createdAt: 'desc' },
+      select: LINE,
+    });
+  }
+
   countLines(userId: string): Promise<number> {
     return this.prisma.cartItem.count({ where: { userId } });
   }

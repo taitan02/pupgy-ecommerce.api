@@ -10,6 +10,7 @@ import { AuthModule } from './modules/auth/auth.module.js';
 import { ShopsModule } from './modules/shops/shops.module.js';
 import { AddressesModule } from './modules/addresses/addresses.module.js';
 import { CartModule } from './modules/cart/cart.module.js';
+import { OrdersModule } from './modules/orders/orders.module.js';
 import { RequestContextMiddleware } from './common/middleware/request-context.middleware.js';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
 import { RateLimitGuard } from './common/rate-limit/rate-limit.guard.js';
@@ -27,6 +28,7 @@ import { RateLimitService } from './common/rate-limit/rate-limit.service.js';
     CatalogModule,
     AddressesModule,
     CartModule,
+    OrdersModule,
   ],
   providers: [
     // Authentication is the default for every route; @Public() is the explicit

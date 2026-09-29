@@ -4,6 +4,7 @@ import { CartRepository, type CartLineRow } from '../repositories/cart.repositor
 import { StorageService } from '../../../infra/storage/storage.service.js';
 import { AppError } from '../../../common/errors/app-error.js';
 import { CartItemIssue, type CartDto, type CartItemDto, type CartShopGroupDto } from '../dto/cart.dto.js';
+import { evaluateLine, optionValuesOf } from './availability.js';
 
 /** A cart with more lines than this is a mistake or a script, not a shopper. */
 const MAX_LINES = 50;
@@ -83,17 +84,7 @@ export class CartService {
   private toItem(row: CartLineRow): CartItemDto & { shop: CartLineRow['sku']['product']['shop'] } {
     const { sku } = row;
     const product = sku.product;
-    const unavailable =
-      !sku.isSellable || product.status !== 'ACTIVE' || product.shop.status !== 'ACTIVE';
-
-    const issue = unavailable
-      ? CartItemIssue.UNAVAILABLE
-      : sku.stock === 0
-        ? CartItemIssue.OUT_OF_STOCK
-        : row.quantity > sku.stock
-          ? CartItemIssue.INSUFFICIENT_STOCK
-          : null;
-
+    const { issue, availableStock } = evaluateLine(row);
     const cover = product.images[0];
 
     return {
@@ -102,16 +93,14 @@ export class CartService {
       productId: product.id,
       productName: product.name,
       productSlug: product.slug,
-      optionValues: [sku.optionValue1?.value, sku.optionValue2?.value].filter(
-        (value): value is string => Boolean(value),
-      ),
+      optionValues: optionValuesOf(row),
       // Read from the SKU on every request. A cart that remembers the price it was
       // added at is a cart that quotes a price the shop is not offering.
       unitPrice: sku.price,
       quantity: row.quantity,
       lineTotal: sku.price * row.quantity,
       imageUrl: cover ? this.storage.publicUrl(cover.storageKey) : null,
-      availableStock: unavailable ? 0 : sku.stock,
+      availableStock,
       issue,
       shop: product.shop,
     };

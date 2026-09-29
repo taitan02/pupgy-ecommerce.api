@@ -7,6 +7,7 @@ import { VariationRepository } from '../repositories/variation.repository.js';
 import { ProductImageRepository } from '../repositories/product-image.repository.js';
 import { planVariations } from './variation-plan.js';
 import { AppError } from '../../../common/errors/app-error.js';
+import { OrderService } from '../../orders/services/order.service.js';
 import { toCursorPage, type CursorPageDto } from '../../../common/dto/cursor-page.dto.js';
 import type { CreateProductDto, UpdateProductDto, UpdateSkuDto } from '../dto/product.dto.js';
 import type { ReplaceVariationsDto, UpdateShippingDto } from '../dto/variation.dto.js';
@@ -26,6 +27,7 @@ export class ProductService {
     private readonly storage: StorageService,
     private readonly variations: VariationRepository,
     private readonly images: ProductImageRepository,
+    private readonly orders: OrderService,
   ) {}
 
   async create(dto: CreateProductDto): Promise<ProductDetailDto> {
@@ -148,12 +150,18 @@ export class ProductService {
   }
 
   /**
-   * Permanent delete. Archiving is the usual path — a product that has been ordered
-   * must never disappear — and once orders exist this will refuse with a 409 for
-   * anything referenced by one.
+   * Permanent delete. Archiving is the usual path, because a product that has been
+   * ordered must never disappear: an order line renders from its own snapshot, but the
+   * SKU is still what stock and returns are accounted against (ADR-012).
    */
   async delete(productId: string): Promise<void> {
     await this.getForSeller(productId);
+
+    if (await this.orders.hasOrdersForProduct(productId)) {
+      // The FK would refuse this anyway. Catching it here means the seller is told to
+      // archive instead of being handed a constraint violation.
+      throw AppError.conflict('This product has been ordered — archive it instead of deleting');
+    }
 
     // Rows cascade with the product; the stored files do not, so collect the keys
     // before the rows are gone.
