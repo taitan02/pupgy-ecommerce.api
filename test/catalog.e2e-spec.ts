@@ -1,7 +1,8 @@
 import request from 'supertest';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createApp, API_PREFIX } from '../src/bootstrap/create-app.js';
+import { API_PREFIX } from '../src/bootstrap/create-app.js';
+import { createTestApp } from './helpers/auth-helpers.js';
 
 /**
  * Runs against a real database (see TEST_DATABASE_URL). The walking skeleton is only
@@ -12,8 +13,7 @@ describe('Catalog (e2e)', () => {
   let app: NestExpressApplication;
 
   beforeAll(async () => {
-    app = await createApp();
-    await app.init();
+    app = await createTestApp();
   });
 
   afterAll(async () => {

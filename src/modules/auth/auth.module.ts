@@ -6,11 +6,15 @@ import { AuthService } from './services/auth.service.js';
 import { TokenService } from './services/token.service.js';
 import { PasswordService } from './services/password.service.js';
 import { UserRepository } from './repositories/user.repository.js';
+import { PasswordResetRepository } from './repositories/password-reset.repository.js';
+import { PasswordResetService } from './services/password-reset.service.js';
 import { SessionRepository } from './repositories/session.repository.js';
+import { NotificationsModule } from '../notifications/notifications.module.js';
 import type { Env } from '../../config/env.schema.js';
 
 @Module({
   imports: [
+    NotificationsModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService<Env, true>) => ({
@@ -22,7 +26,15 @@ import type { Env } from '../../config/env.schema.js';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, TokenService, PasswordService, UserRepository, SessionRepository],
+  providers: [
+    AuthService,
+    PasswordResetService,
+    TokenService,
+    PasswordService,
+    UserRepository,
+    PasswordResetRepository,
+    SessionRepository,
+  ],
   exports: [AuthService, UserRepository, JwtModule],
 })
 export class AuthModule {}

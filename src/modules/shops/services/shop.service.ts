@@ -80,6 +80,13 @@ export class ShopService {
     return this.shops.update(shopId, input);
   }
 
+  /** Who gets told when an order arrives. Owners only: staff can work the orders,
+   *  but the owner is the one accountable for the shop answering them. */
+  async listOwnerEmails(shopId: string): Promise<string[]> {
+    const members = await this.members.listByShop(shopId);
+    return members.filter((member) => member.role === 'OWNER').map((member) => member.user.email);
+  }
+
   listMembers(shopId: string) {
     return this.members.listByShop(shopId);
   }

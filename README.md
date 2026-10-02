@@ -12,7 +12,13 @@ pnpm install
 pnpm prisma:migrate        # create/apply migrations
 pnpm prisma:seed           # platform category tree
 pnpm start:dev             # http://localhost:3000
+pnpm start:worker          # background jobs — a second terminal
 ```
+
+`start:dev` serves HTTP. `start:worker` runs the BullMQ processors from the same
+codebase through a different entrypoint (`main.worker.ts`). **Nothing sends email
+unless the worker is running**, and the API stays perfectly healthy without it — jobs
+simply pile up in Redis. Read what was sent at Mailpit: <http://localhost:8025>.
 
 | URL | What |
 |---|---|
@@ -25,7 +31,8 @@ pnpm start:dev             # http://localhost:3000
 
 | Script | Purpose |
 |---|---|
-| `pnpm start:dev` | Watch mode |
+| `pnpm start:dev` | Watch mode, HTTP |
+| `pnpm start:worker` | Watch mode, background jobs only (no port) |
 | `pnpm typecheck` | `tsc --noEmit` |
 | `pnpm lint` | oxlint, type-aware |
 | `pnpm test` / `test:e2e` | Vitest unit / end-to-end (e2e needs a live database) |
@@ -104,9 +111,38 @@ One `User` identity; being a merchant means having a `ShopMember` row (ADR-007).
 ### Known gaps, deliberately
 | Gap | Plan |
 |---|---|
-| No password reset | Needs the mail queue; next slice |
 | No email verification | Post-MVP (v1.1) |
 | Suspending a user does not kill live access tokens | Acceptable for a 15-minute window; revisit if it ever isn't |
+
+## Mail and background jobs (Phase 8)
+
+Transactional email is queued, never sent inline (ADR-013): a checkout must not be as
+slow or as available as the mail provider.
+
+| Piece | Where |
+|---|---|
+| Producer | `NotificationService.enqueue()` — swallows its own errors on purpose |
+| Consumer | `MailProcessor`, provided only by `WorkerModule` |
+| Transport | `MailService` — nodemailer over SMTP, Mailpit locally, SendGrid's relay in production |
+| Templates | `modules/notifications/templates/*.ts` — plain functions, no template engine |
+
+Three rules the code depends on:
+
+1. **Enqueue after the transaction commits.** A worker can pick the job up before the
+   commit lands and query for a row that does not exist yet.
+2. **Jobs carry ids, not rendered content.** The worker re-reads and renders at send
+   time, so a retried job describes what is true now — and a status email whose order
+   has since moved on is dropped rather than sent.
+3. **Job ids use `-`, never `:`.** BullMQ builds its Redis keys with colons and rejects
+   an id containing one. Since enqueue failures are swallowed, a colon there would
+   silently disable every email in the system with no failing request to show for it.
+   That happened; `test/mail.e2e-spec.ts` now covers it.
+
+### Password reset
+
+`POST /auth/forgot-password` always answers `202`, for any address. Answering
+differently would make it an oracle for which emails have accounts. Redeeming a link
+revokes **every** session of that user, in both apps.
 
 ## Catalog model (Phase 4)
 

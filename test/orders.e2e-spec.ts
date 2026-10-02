@@ -2,9 +2,8 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { createApp } from '../src/bootstrap/create-app.js';
 import { PrismaService } from '../src/infra/prisma/prisma.service.js';
-import { createShop, registerUser, uniqueSlug, url, type TestSession } from './helpers/auth-helpers.js';
+import { createShop, registerUser, uniqueSlug, url, type TestSession, createTestApp } from './helpers/auth-helpers.js';
 
 describe('Orders (e2e)', () => {
   let app: NestExpressApplication;
@@ -17,8 +16,7 @@ describe('Orders (e2e)', () => {
   let addressId: string;
 
   beforeAll(async () => {
-    app = await createApp();
-    await app.init();
+    app = await createTestApp();
     prisma = app.get(PrismaService);
 
     buyer = await registerUser(app, 'STOREFRONT');

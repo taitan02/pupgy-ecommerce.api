@@ -1,8 +1,7 @@
 import request from 'supertest';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createApp } from '../src/bootstrap/create-app.js';
-import { createShop, registerUser, uniqueSlug, url, type TestSession } from './helpers/auth-helpers.js';
+import { createShop, registerUser, uniqueSlug, url, type TestSession, createTestApp } from './helpers/auth-helpers.js';
 
 /**
  * The isolation suite. Every seller feature added from here on gets a case in a file
@@ -18,8 +17,7 @@ describe('Shop isolation (e2e)', () => {
   let shopB: string;
 
   beforeAll(async () => {
-    app = await createApp();
-    await app.init();
+    app = await createTestApp();
 
     alice = await registerUser(app, 'SELLER');
     bob = await registerUser(app, 'SELLER');

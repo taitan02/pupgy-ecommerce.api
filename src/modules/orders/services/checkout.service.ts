@@ -7,6 +7,7 @@ import { AddressRepository, type AddressRecord } from '../../addresses/repositor
 import { CartItemIssue } from '../../cart/dto/cart.dto.js';
 import { evaluateLine, optionValuesOf } from '../../cart/services/availability.js';
 import { OrderRepository, OutOfStockError, type NewOrderLine } from '../repositories/order.repository.js';
+import { NotificationService } from '../../notifications/notification.service.js';
 import { generateOrderCode } from './order-code.js';
 import { toOrderDto } from './order-mapper.js';
 import type { CheckoutLineDto, CheckoutQuoteDto, PlaceOrderResultDto } from '../dto/order.dto.js';
@@ -28,6 +29,7 @@ export class CheckoutService {
     private readonly addresses: AddressRepository,
     private readonly orders: OrderRepository,
     private readonly storage: StorageService,
+    private readonly notifications: NotificationService,
   ) {}
 
   /**
@@ -131,6 +133,11 @@ export class CheckoutService {
         idempotencyKey: dto.idempotencyKey,
         lines,
       });
+
+      // After the transaction, never inside it: a worker can pick a job up before the
+      // commit lands and query for an order that does not exist yet (ADR-013).
+      await this.notifications.enqueue({ type: 'order-placed', orderId: order.id });
+      await this.notifications.enqueue({ type: 'order-received', orderId: order.id });
 
       return this.result(order, userId);
     } catch (error) {

@@ -3,6 +3,7 @@ import { ApiBody, ApiOkResponse, ApiOperation, ApiTags, ApiTooManyRequestsRespon
 import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
 import { AuthService } from './services/auth.service.js';
+import { PasswordResetService } from './services/password-reset.service.js';
 import {
   AuthResponseDto,
   AuthUserDto,
@@ -11,6 +12,7 @@ import {
   TokenResponseDto,
 } from './dto/auth.dto.js';
 import { RefreshDto } from './dto/refresh.dto.js';
+import { ForgotPasswordDto, ResetPasswordDto } from './dto/password-reset.dto.js';
 import { REFRESH_COOKIE, REFRESH_COOKIE_PATH } from './auth.types.js';
 import { CurrentUser, Public } from '../../common/decorators/auth.decorators.js';
 import { RateLimit } from '../../common/rate-limit/rate-limit.decorator.js';
@@ -29,6 +31,7 @@ import type { Env } from '../../config/env.schema.js';
 export class AuthController {
   constructor(
     private readonly auth: AuthService,
+    private readonly passwordReset: PasswordResetService,
     private readonly config: ConfigService<Env, true>,
   ) {}
 
@@ -66,6 +69,36 @@ export class AuthController {
     const result = await this.auth.login(dto, dto.audience, clientInfo(request));
     this.setRefreshCookie(response, dto.audience, result);
     return { accessToken: result.accessToken, expiresIn: this.accessTtlSeconds(), user: result.user };
+  }
+
+  @Post('forgot-password')
+  @Public()
+  // Same two scopes as login: per email stops someone hammering one victim's inbox,
+  // per IP stops a script harvesting which addresses are registered.
+  @RateLimit(
+    { name: 'forgot-email', limitKey: 'RATE_LIMIT_LOGIN_PER_EMAIL', windowSeconds: 900, by: 'email' },
+    { name: 'forgot-ip', limitKey: 'RATE_LIMIT_AUTH_PER_IP', windowSeconds: 900, by: 'ip' },
+  )
+  @HttpCode(202)
+  @ApiOperation({
+    summary: 'Send a password-reset link',
+    description:
+      'Always accepted, whether or not the address has an account. Answering differently would turn this into a way to discover which emails are registered.',
+  })
+  async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<void> {
+    await this.passwordReset.request(dto.email, dto.audience);
+  }
+
+  @Post('reset-password')
+  @Public()
+  @RateLimit({ name: 'reset-ip', limitKey: 'RATE_LIMIT_AUTH_PER_IP', windowSeconds: 900, by: 'ip' })
+  @HttpCode(204)
+  @ApiOperation({
+    summary: 'Set a new password using an emailed token',
+    description: 'Revokes every session of the account, in both apps.',
+  })
+  async resetPassword(@Body() dto: ResetPasswordDto): Promise<void> {
+    await this.passwordReset.reset(dto.token, dto.password);
   }
 
   @Post('refresh')

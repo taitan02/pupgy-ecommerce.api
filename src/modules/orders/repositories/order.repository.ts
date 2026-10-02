@@ -235,6 +235,19 @@ export class OrderRepository {
     });
   }
 
+  /**
+   * Unscoped read by id, for the mail worker only.
+   *
+   * Every other read here is scoped to a buyer or a shop, because every other read
+   * serves a request made by one of them (ADR-006). The worker serves neither: it is
+   * rendering an email the system decided to send, with no caller to authorise
+   * against. Keeping it as its own named method makes that exception visible instead
+   * of loosening the scoped ones.
+   */
+  findForNotification(id: string): Promise<OrderRow | null> {
+    return this.prisma.order.findUnique({ where: { id }, select: ORDER_SELECT });
+  }
+
   findByIdempotencyKey(buyerId: string, idempotencyKey: string): Promise<OrderRow | null> {
     return this.prisma.order.findUnique({
       where: { buyerId_idempotencyKey: { buyerId, idempotencyKey } },

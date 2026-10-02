@@ -1,17 +1,15 @@
 import request from 'supertest';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createApp } from '../src/bootstrap/create-app.js';
 import { RedisService } from '../src/infra/redis/redis.service.js';
-import { registerUser, uniqueEmail, url } from './helpers/auth-helpers.js';
+import { registerUser, uniqueEmail, url, createTestApp } from './helpers/auth-helpers.js';
 
 describe('Login rate limiting (e2e)', () => {
   let app: NestExpressApplication;
   let redis: RedisService;
 
   beforeAll(async () => {
-    app = await createApp();
-    await app.init();
+    app = await createTestApp();
 
     redis = app.get(RedisService);
     // .env.test points at Redis database 1, so this cannot touch dev data.

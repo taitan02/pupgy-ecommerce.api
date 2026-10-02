@@ -1,6 +1,6 @@
 import request from 'supertest';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { API_PREFIX } from '../../src/bootstrap/create-app.js';
+import { API_PREFIX, createApp } from '../../src/bootstrap/create-app.js';
 
 export const url = (path: string) => `/${API_PREFIX}${path}`;
 
@@ -57,4 +57,20 @@ export function extractRefreshCookie(setCookie: string[] | string | undefined): 
 
 export function uniqueSlug(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+/**
+ * Boots the application for a spec file and gets it listening once.
+ *
+ * `await app.init()` alone is not enough. Supertest starts an ephemeral server for
+ * every single request when the app is not already listening, so a spec file opens and
+ * closes hundreds of them — and under load a request occasionally lands on one that is
+ * already closing. That surfaces as nonsense: a 404 from a route that plainly exists,
+ * an empty list, `socket hang up`. Listening once removes the churn.
+ */
+export async function createTestApp(): Promise<NestExpressApplication> {
+  const app = await createApp();
+  await app.init();
+  await new Promise<void>((resolve) => app.getHttpServer().listen(0, resolve));
+  return app;
 }

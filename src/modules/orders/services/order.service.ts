@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { AppError } from '../../../common/errors/app-error.js';
 import { toCursorPage, type CursorPageDto } from '../../../common/dto/cursor-page.dto.js';
 import { StorageService } from '../../../infra/storage/storage.service.js';
+import { NotificationService } from '../../notifications/notification.service.js';
 import { OrderRepository, type OrderRow } from '../repositories/order.repository.js';
 import { canTransition, RESTOCKS_ON_CANCEL, type Actor } from '../order-state.js';
 import { toListItemDto, toOrderDto } from './order-mapper.js';
@@ -13,6 +14,7 @@ export class OrderService {
   constructor(
     private readonly orders: OrderRepository,
     private readonly storage: StorageService,
+    private readonly notifications: NotificationService,
   ) {}
 
   // ---------- buyer ----------
@@ -71,6 +73,12 @@ export class OrderService {
     return this.move({ load: () => this.requireForShop(id), to, actor: 'SELLER', reason });
   }
 
+  /** The order behind a queued email, with no caller to scope it to. See the
+   *  repository method for why this exception exists. */
+  findForNotification(orderId: string): Promise<OrderRow | null> {
+    return this.orders.findForNotification(orderId);
+  }
+
   /** Whether any of a product's SKUs has ever been sold, for the catalog's delete
    *  guard. The FK would refuse the delete anyway; this turns it into an answer the
    *  seller can act on. */
@@ -112,6 +120,11 @@ export class OrderService {
       // of the sale got there first.
       throw AppError.conflict('This order has just been updated; reload and try again');
     }
+
+    // The transition transaction has committed by now, and the job carries only the
+    // id and the state it was queued for — the worker drops it if the order has moved
+    // on since (ADR-013).
+    await this.notifications.enqueue({ type: 'order-status', orderId: moved.id, status: input.to });
 
     return toOrderDto(moved, this.storage, input.actor);
   }

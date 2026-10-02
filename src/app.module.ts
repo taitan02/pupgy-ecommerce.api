@@ -4,6 +4,8 @@ import { AppConfigModule } from './config/config.module.js';
 import { PrismaModule } from './infra/prisma/prisma.module.js';
 import { RedisModule } from './infra/redis/redis.module.js';
 import { StorageModule } from './infra/storage/storage.module.js';
+import { QueueModule } from './infra/queue/queue.module.js';
+import { MailModule } from './infra/mail/mail.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { CatalogModule } from './modules/catalog/catalog.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
@@ -22,6 +24,8 @@ import { RateLimitService } from './common/rate-limit/rate-limit.service.js';
     PrismaModule,
     RedisModule,
     StorageModule,
+    QueueModule,
+    MailModule,
     HealthModule,
     AuthModule,
     ShopsModule,

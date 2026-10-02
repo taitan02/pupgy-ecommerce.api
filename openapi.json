@@ -141,6 +141,84 @@
         ]
       }
     },
+    "/api/v1/auth/forgot-password": {
+      "post": {
+        "description": "Always accepted, whether or not the address has an account. Answering differently would turn this into a way to discover which emails are registered.",
+        "operationId": "AuthController_forgotPassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": ""
+          },
+          "429": {
+            "description": "Rate limit exceeded. The Retry-After header says how long to wait."
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Send a password-reset link",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/reset-password": {
+      "post": {
+        "description": "Revokes every session of the account, in both apps.",
+        "operationId": "AuthController_resetPassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "429": {
+            "description": "Rate limit exceeded. The Retry-After header says how long to wait."
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Set a new password using an emailed token",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/v1/auth/refresh": {
       "post": {
         "operationId": "AuthController_refresh",
@@ -2809,6 +2887,45 @@
           "email",
           "password",
           "audience"
+        ]
+      },
+      "ForgotPasswordDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "tai@example.com"
+          },
+          "audience": {
+            "type": "string",
+            "enum": [
+              "STOREFRONT",
+              "SELLER"
+            ],
+            "description": "Which app the link should open — the password itself is shared (ADR-007)"
+          }
+        },
+        "required": [
+          "email",
+          "audience"
+        ]
+      },
+      "ResetPasswordDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "The token from the emailed link"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 10,
+            "description": "Minimum 10 characters, same rule as registration"
+          }
+        },
+        "required": [
+          "token",
+          "password"
         ]
       },
       "RefreshDto": {

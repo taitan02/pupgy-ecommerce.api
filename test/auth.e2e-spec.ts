@@ -1,15 +1,13 @@
 import request from 'supertest';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createApp } from '../src/bootstrap/create-app.js';
-import { extractRefreshCookie, registerUser, uniqueEmail, url } from './helpers/auth-helpers.js';
+import { extractRefreshCookie, registerUser, uniqueEmail, url, createTestApp } from './helpers/auth-helpers.js';
 
 describe('Auth (e2e)', () => {
   let app: NestExpressApplication;
 
   beforeAll(async () => {
-    app = await createApp();
-    await app.init();
+    app = await createTestApp();
   });
 
   afterAll(async () => {

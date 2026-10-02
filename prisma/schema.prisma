@@ -56,6 +56,7 @@ model User {
   addresses   Address[]
   cartItems   CartItem[]
   orders      Order[]
+  passwordResets PasswordResetToken[]
 
   @@map("users")
 }
@@ -516,4 +517,25 @@ model InventoryMovement {
   @@index([skuId, id])
   @@index([shopId, id])
   @@map("inventory_movements")
+}
+
+/// A one-shot password-reset link.
+///
+/// Only the SHA-256 lives here: the plaintext exists in the email and nowhere else, so
+/// a database dump cannot be used to take over accounts — the same reasoning as
+/// refresh tokens (ADR-007).
+model PasswordResetToken {
+  id        String    @id @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash") @db.Char(64)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
+  /// Set the moment it is redeemed. A second use is refused, not honoured.
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
 }
