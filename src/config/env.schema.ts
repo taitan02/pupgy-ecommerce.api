@@ -79,10 +79,31 @@ export const envSchema = z.object({
         .filter(Boolean),
     ),
 
+  // Bull Board: a queue dashboard that can read job payloads and delete or replay
+  // jobs. It is an admin surface, so it is off unless switched on and refuses to
+  // start without a password (see the refinement below).
+  BULL_BOARD_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+  BULL_BOARD_USER: z.string().default('admin'),
+  BULL_BOARD_PASSWORD: z.string().optional(),
+
   SWAGGER_ENABLED: z
     .enum(['true', 'false'])
     .default('true')
     .transform((value) => value === 'true'),
+}).superRefine((env, ctx) => {
+  // Fail at boot, not at the first request. A dashboard that exposes job payloads and
+  // lets anyone replay jobs must never come up open, and the way to guarantee that is
+  // to make "enabled without a password" a configuration that cannot start.
+  if (env.BULL_BOARD_ENABLED && !env.BULL_BOARD_PASSWORD) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['BULL_BOARD_PASSWORD'],
+      message: 'BULL_BOARD_PASSWORD is required when BULL_BOARD_ENABLED=true',
+    });
+  }
 });
 
 export type Env = z.infer<typeof envSchema>;

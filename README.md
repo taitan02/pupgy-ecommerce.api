@@ -24,6 +24,7 @@ simply pile up in Redis. Read what was sent at Mailpit: <http://localhost:8025>.
 |---|---|
 | `/api/v1/health/live` | Liveness — never touches the database |
 | `/api/v1/health/ready` | Readiness — checks the database; reports Redis without failing |
+| `/api/v1/health/queues` | Queue depth, and `stalled` when nothing is consuming |
 | `/api/v1/storefront/categories` | Public category tree |
 | `/docs` | Swagger UI (disable in production) |
 
@@ -138,11 +139,45 @@ Three rules the code depends on:
    silently disable every email in the system with no failing request to show for it.
    That happened; `test/mail.e2e-spec.ts` now covers it.
 
+### Seeing the queue
+
+`enqueue` swallows its errors and the API is perfectly healthy with no worker behind
+it. Both are deliberate — and both mean the system can be broken while looking fine, so
+the breakage needs somewhere to show.
+
+`GET /health/queues` is that place. It reports `status: "stalled"` when the oldest
+waiting job is older than two minutes, which is what "nobody deployed the worker"
+looks like from the outside. Deliberately **not** part of `/ready`: a dead worker must
+not take the API out of rotation, because serving the storefront is still right.
+
+`failed` is reported but never sets the status — those jobs are kept for days, so one
+permanently bad address would hold the endpoint red long after anyone could act. Alert
+on it *rising*; the endpoint has no memory to make that judgement itself.
+
+Bull Board is available at `/admin/queues`, **off by default**:
+
+```bash
+BULL_BOARD_ENABLED=true
+BULL_BOARD_USER=admin
+BULL_BOARD_PASSWORD=<something>
+```
+
+It is an admin surface, not a status page: it shows job payloads and can delete and
+replay jobs. It mounts as raw Express, so **none of Nest's guards apply to it** — the
+Basic auth in `bootstrap/bull-board.ts` is the entire access control. The config
+refuses to boot with the board enabled and no password, so it cannot come up open by
+accident.
+
 ### Password reset
 
 `POST /auth/forgot-password` always answers `202`, for any address. Answering
 differently would make it an oracle for which emails have accounts. Redeeming a link
 revokes **every** session of that user, in both apps.
+
+The reset token cannot avoid travelling through Redis — the plaintext exists for one
+moment and the email needs it — so that job alone is dropped the instant it is
+delivered, instead of being kept for the default day. Without that, a usable token sits
+readable in the queue long after the database only knows its hash.
 
 ## Catalog model (Phase 4)
 

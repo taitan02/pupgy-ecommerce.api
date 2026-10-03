@@ -71,10 +71,7 @@ describe('Password reset (e2e)', () => {
   /** The token only exists in the email; the database has its hash. Pulling it out of
    *  the link is exactly what a person does. */
   async function tokenFromEmail(email = user.email): Promise<string> {
-    // Generous: a BullMQ worker attaches to the queue a moment after the context
-    // boots, so the first job of the file can sit waiting for a second or two. The
-    // assertion is unchanged — only the patience is.
-    const message = await waitForMessage(addressedTo(email), 15_000);
+    const message = await waitForMessage(addressedTo(email));
     const html = await messageHtml(message.ID);
     const match = /reset-password\?token=([A-Za-z0-9_-]+)/.exec(html);
     if (!match) throw new Error('No reset link in the email');
@@ -96,6 +93,18 @@ describe('Password reset (e2e)', () => {
       const nobody = uniqueEmail('nobody');
       await forgot(nobody).expect(202);
       await expect(waitForMessage(addressedTo(nobody), 1_500)).rejects.toThrow(/No matching/);
+    });
+
+    it('leaves no copy of the token in Redis once the email is sent', async () => {
+      // The database only ever sees the SHA-256, but the job payload must carry the
+      // plaintext — the email needs it. The default retention would then leave a live
+      // token readable in the queue for a day, which undoes the point of hashing it.
+      await forgot(user.email).expect(202);
+      await tokenFromEmail();
+
+      const queue = app.get(getQueueToken(MAIL_QUEUE)) as Queue;
+      const lingering = await queue.getJobs(['completed', 'waiting', 'active', 'delayed']);
+      expect(lingering.filter((job) => job.data.type === 'password-reset')).toHaveLength(0);
     });
 
     it('stores only the hash of the token', async () => {

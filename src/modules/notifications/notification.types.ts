@@ -43,3 +43,22 @@ export function jobIdFor(job: MailJob): string {
       return `password-reset-${job.token.slice(0, 16)}`;
   }
 }
+
+/**
+ * Per-job retention, on top of the queue defaults.
+ *
+ * A reset link cannot avoid travelling through Redis: the plaintext exists for one
+ * moment, when it is generated, and the email needs it. The database only ever sees
+ * the SHA-256 — but the queue payload holds the real thing, so the default
+ * "keep completed jobs for a day" would leave a usable token readable in Redis for
+ * 24 hours after it was delivered. Dropping the job the instant it is sent shrinks
+ * that window to the delivery itself.
+ *
+ * The failed copy is kept for an hour rather than a week for the same reason: long
+ * enough to diagnose a bounce, short enough not to be a store of live credentials.
+ */
+export function jobRetentionFor(job: MailJob) {
+  return job.type === 'password-reset'
+    ? { removeOnComplete: true, removeOnFail: { age: 3_600 } }
+    : {};
+}

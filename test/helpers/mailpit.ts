@@ -23,7 +23,10 @@ export const addressedTo = (email: string) => (message: CapturedMessage) =>
 /** Polls, because SMTP delivery finishes slightly after `sendMail` resolves. */
 export async function waitForMessage(
   predicate: (message: CapturedMessage) => boolean,
-  timeoutMs = 5_000,
+  // Generous by default: a BullMQ worker attaches to the queue a moment after its
+  // context boots, so the first job of a spec file can sit waiting for a second or
+  // two. Callers asserting that *nothing* arrives pass a short timeout explicitly.
+  timeoutMs = 15_000,
 ): Promise<CapturedMessage> {
   const deadline = Date.now() + timeoutMs;
 

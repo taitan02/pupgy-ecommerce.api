@@ -51,6 +51,38 @@
         ]
       }
     },
+    "/api/v1/health/queues": {
+      "get": {
+        "operationId": "HealthController_queues",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueHealthDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Queue depth and whether anything is consuming",
+        "tags": [
+          "health"
+        ]
+      }
+    },
     "/api/v1/auth/register": {
       "post": {
         "operationId": "AuthController_register",
@@ -2786,6 +2818,59 @@
       }
     },
     "schemas": {
+      "MailQueueStatsDto": {
+        "type": "object",
+        "properties": {
+          "waiting": {
+            "type": "number",
+            "description": "Enqueued and not yet picked up"
+          },
+          "active": {
+            "type": "number",
+            "description": "Being processed right now"
+          },
+          "delayed": {
+            "type": "number",
+            "description": "Scheduled for later, or waiting out a retry backoff"
+          },
+          "failed": {
+            "type": "number",
+            "description": "Gave up after every attempt. Alert on this increasing."
+          },
+          "oldestWaitingSeconds": {
+            "type": "number",
+            "nullable": true,
+            "description": "Age of the oldest waiting job. Climbing means nothing is consuming."
+          }
+        },
+        "required": [
+          "waiting",
+          "active",
+          "delayed",
+          "failed",
+          "oldestWaitingSeconds"
+        ]
+      },
+      "QueueHealthDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "stalled"
+            ],
+            "description": "`stalled` means work is queued and no worker is taking it"
+          },
+          "mail": {
+            "$ref": "#/components/schemas/MailQueueStatsDto"
+          }
+        },
+        "required": [
+          "status",
+          "mail"
+        ]
+      },
       "RegisterDto": {
         "type": "object",
         "properties": {
