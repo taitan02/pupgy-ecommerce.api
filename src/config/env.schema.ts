@@ -37,6 +37,15 @@ export const envSchema = z.object({
   /// Where uploaded files are readable from: the R2 public domain, or MinIO locally.
   S3_PUBLIC_BASE_URL: z.string().min(1),
 
+  /// 32 bytes, base64. Encrypts the per-shop SePay webhook secrets at rest (ADR-014).
+  /// Generate with: openssl rand -base64 32
+  /// Not the JWT secret and never reused as one — losing this means every merchant
+  /// re-enters their webhook secret, leaking it means every one must be rotated.
+  ENCRYPTION_KEY: z.string().min(1),
+
+  /// How long a QR order holds its stock before the sweeper cancels it.
+  PAYMENT_EXPIRY_MINUTES: z.coerce.number().int().positive().default(15),
+
   // Mail. One transport everywhere: Mailpit locally, SendGrid's SMTP relay in
   // staging and production (username `apikey`, password = the API key). Using the
   // same protocol in both means the path we exercise daily is the path that ships
@@ -54,6 +63,11 @@ export const envSchema = z.object({
   /// Must be on a domain SendGrid has authenticated, or everything lands in spam.
   MAIL_FROM: z.string().default('no-reply@pupgy.local'),
   MAIL_FROM_NAME: z.string().default('Pupgy'),
+
+  /// Where this API is reachable from the internet. SePay has to be able to POST to
+  /// it, so a merchant pasting a webhook URL needs the real host, not localhost — in
+  /// development that is whatever tunnel is forwarding to port 3000.
+  API_PUBLIC_URL: z.string().default('http://localhost:3000'),
 
   // Public URLs of the two frontends. Emails link into them, and a link is useless
   // if the API has to guess the host it is deployed behind.

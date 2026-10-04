@@ -67,7 +67,10 @@ export interface NewOrder {
   code: string;
   shopId: string;
   buyerId: string;
-  paymentMethod: 'COD';
+  paymentMethod: 'COD' | 'SEPAY_QR';
+  /** COD orders start at PENDING; a QR order starts in AWAITING_PAYMENT with the
+   *  stock already taken, and the expiry job is what releases it (ADR-014). */
+  status: 'PENDING' | 'AWAITING_PAYMENT';
   recipientName: string;
   phone: string;
   provinceName: string;
@@ -114,6 +117,7 @@ export class OrderRepository {
           shopId: order.shopId,
           buyerId: order.buyerId,
           paymentMethod: order.paymentMethod,
+          status: order.status,
           recipientName: order.recipientName,
           phone: order.phone,
           provinceName: order.provinceName,
@@ -297,7 +301,14 @@ export class OrderRepository {
       _count: { _all: true },
     });
 
-    const counts = { PENDING: 0, CONFIRMED: 0, SHIPPING: 0, DELIVERED: 0, CANCELLED: 0 };
+    const counts = {
+      AWAITING_PAYMENT: 0,
+      PENDING: 0,
+      CONFIRMED: 0,
+      SHIPPING: 0,
+      DELIVERED: 0,
+      CANCELLED: 0,
+    };
     for (const row of rows) counts[row.status] = row._count._all;
     return counts;
   }

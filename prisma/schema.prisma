@@ -102,6 +102,8 @@ model Shop {
   members  ShopMember[]
   products Product[]
   orders   Order[]
+  paymentAccount ShopPaymentAccount?
+  paymentEvents  PaymentEvent[]
 
   @@map("shops")
 }
@@ -362,6 +364,9 @@ model CartItem {
 }
 
 enum OrderStatus {
+  /// Placed, stock already taken, waiting for the bank transfer to arrive. Only
+  /// SEPAY_QR orders start here; COD orders start at PENDING (ADR-014).
+  AWAITING_PAYMENT
   PENDING
   CONFIRMED
   SHIPPING
@@ -388,6 +393,9 @@ enum PaymentStatus {
 enum CancelledBy {
   BUYER
   SELLER
+  /// The expiry job. "Nobody" is not an answer a buyer accepts when their order
+  /// disappears, so the system owns its own cancellations (ADR-014).
+  SYSTEM
 
   @@map("cancelled_by")
 }
@@ -452,6 +460,7 @@ model Order {
 
   items     OrderItem[]
   movements InventoryMovement[]
+  payment   Payment?
 
   @@unique([buyerId, idempotencyKey])
   // Same composite trick as products: lets a line reference (order_id, shop_id)
@@ -538,4 +547,109 @@ model PasswordResetToken {
   @@index([userId])
   @@index([expiresAt])
   @@map("password_reset_tokens")
+}
+
+enum PaymentRecordStatus {
+  PENDING
+  PAID
+  /// The buyer never paid and the window closed. The order is cancelled and the
+  /// units go back (ADR-014).
+  EXPIRED
+  CANCELLED
+
+  @@map("payment_record_status")
+}
+
+/// A shop's own SePay account: the bank account buyers transfer into, and the secret
+/// that proves a webhook really came from SePay.
+///
+/// One per shop, because the platform never receives a payment (ADR-001). A shop
+/// without a row here is simply not offered QR at checkout.
+model ShopPaymentAccount {
+  id     String @id @db.Uuid
+  shopId String @unique @map("shop_id") @db.Uuid
+
+  /// SePay's short bank name, e.g. "Vietcombank" — it goes straight into the QR URL.
+  bankCode      String @map("bank_code") @db.VarChar(40)
+  accountNumber String @map("account_number") @db.VarChar(40)
+  /// Shown next to the QR so a buyer can see who they are paying.
+  accountName   String @map("account_name") @db.VarChar(120)
+
+  /// The random path segment in this shop's webhook URL. It exists to choose which
+  /// secret to verify against before any payload can be trusted — it is not a
+  /// credential, and knowing it does not let anyone forge a signature.
+  webhookId String @unique @map("webhook_id") @db.VarChar(64)
+
+  /// AES-256-GCM, not a hash. Verifying an HMAC means recomputing it, which needs the
+  /// real key back — hash what you only ever compare, encrypt what you must replay.
+  webhookSecretCipher String @map("webhook_secret_cipher") @db.VarChar(500)
+
+  /// The merchant can switch QR off without deleting their bank details.
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@map("shop_payment_accounts")
+}
+
+/// The money side of one order. Separate from the order because an order is a
+/// commitment to ship and a payment is a claim about a bank transfer; they fail,
+/// expire and get argued about independently.
+model Payment {
+  id      String @id @db.Uuid
+  orderId String @unique @map("order_id") @db.Uuid
+  shopId  String @map("shop_id") @db.Uuid
+
+  /// Integer VND, copied from the order. The webhook must match this exactly: a
+  /// partial transfer is a conversation, not a paid order.
+  amount Int
+  status PaymentRecordStatus @default(PENDING)
+
+  /// What the buyer is told to put in the transfer memo, and what we look for in the
+  /// webhook's `content`. The order code, since that is what the buyer already sees.
+  reference String @db.VarChar(32)
+
+  /// When the hold on the stock runs out.
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
+  paidAt    DateTime? @map("paid_at") @db.Timestamptz(3)
+
+  /// SePay's own transaction id, written at the moment the payment is accepted.
+  providerTransactionId String? @map("provider_transaction_id") @db.VarChar(64)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([status, expiresAt])
+  @@map("payments")
+}
+
+/// Every webhook body we accepted, kept raw.
+///
+/// The unique index on (shop, provider transaction) is the deduplication: SePay
+/// retries up to seven times over five hours, so a repeated delivery is documented
+/// behaviour, not an edge case. The insert and the payment update happen in one
+/// transaction, so the index — not a prior check — decides who wins (ADR-014).
+model PaymentEvent {
+  id     String @id @db.Uuid
+  shopId String @map("shop_id") @db.Uuid
+
+  providerTransactionId String @map("provider_transaction_id") @db.VarChar(64)
+  /// Exactly what arrived. Disputes are settled against this, not against our
+  /// interpretation of it.
+  payload Json
+  /// The payment it was matched to, or null when nothing matched — an unmatched
+  /// transfer is still evidence and still worth keeping.
+  paymentId String? @map("payment_id") @db.Uuid
+
+  receivedAt DateTime @default(now()) @map("received_at") @db.Timestamptz(3)
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, providerTransactionId])
+  @@index([shopId, receivedAt])
+  @@map("payment_events")
 }

@@ -3,6 +3,7 @@ import { AppError } from '../../../common/errors/app-error.js';
 import { toCursorPage, type CursorPageDto } from '../../../common/dto/cursor-page.dto.js';
 import { StorageService } from '../../../infra/storage/storage.service.js';
 import { NotificationService } from '../../notifications/notification.service.js';
+import { PaymentService } from '../../payments/services/payment.service.js';
 import { OrderRepository, type OrderRow } from '../repositories/order.repository.js';
 import { canTransition, RESTOCKS_ON_CANCEL, type Actor } from '../order-state.js';
 import { toListItemDto, toOrderDto } from './order-mapper.js';
@@ -15,6 +16,7 @@ export class OrderService {
     private readonly orders: OrderRepository,
     private readonly storage: StorageService,
     private readonly notifications: NotificationService,
+    private readonly payments: PaymentService,
   ) {}
 
   // ---------- buyer ----------
@@ -32,6 +34,16 @@ export class OrderService {
     return toOrderDto(await this.requireForBuyer(buyerId, id), this.storage, 'BUYER');
   }
 
+  /** What the buyer needs in order to transfer. Scoped to them: a payment reference
+   *  is enough to pay somebody else's order by accident. */
+  async paymentFor(buyerId: string, orderId: string) {
+    await this.requireForBuyer(buyerId, orderId);
+    const payment = await this.payments.findByOrder(orderId);
+    if (!payment) throw AppError.notFound('This order is not paid by transfer');
+
+    return this.payments.instructionsFor(payment);
+  }
+
   /** The buyer changing their mind, which is only allowed while the shop has not
    *  started packing (ADR-012). */
   cancelAsBuyer(buyerId: string, id: string, reason?: string): Promise<OrderDto> {
@@ -39,6 +51,20 @@ export class OrderService {
       load: () => this.requireForBuyer(buyerId, id),
       to: 'CANCELLED',
       actor: 'BUYER',
+      reason,
+    });
+  }
+
+  /**
+   * The expiry job closing an unpaid order. Not reachable from any endpoint: `SYSTEM`
+   * is the only actor allowed to make this move, and it loads the order unscoped
+   * because there is no caller to scope it to (ADR-014).
+   */
+  cancelAsSystem(orderId: string, reason: string): Promise<OrderDto> {
+    return this.move({
+      load: () => this.requireForNotification(orderId),
+      to: 'CANCELLED',
+      actor: 'SYSTEM',
       reason,
     });
   }
@@ -61,6 +87,7 @@ export class OrderService {
   async summaryForShop(): Promise<OrderSummaryDto> {
     const counts = await this.orders.countByStatusForShop();
     return {
+      awaitingPayment: counts.AWAITING_PAYMENT,
       pending: counts.PENDING,
       confirmed: counts.CONFIRMED,
       shipping: counts.SHIPPING,
@@ -100,10 +127,13 @@ export class OrderService {
   }): Promise<OrderDto> {
     const current = await input.load();
 
-    if (!canTransition(current.status, input.to, input.actor)) {
-      throw AppError.conflict(`An order that is ${current.status} cannot become ${input.to}`, {
-        status: current.status,
-      });
+    if (!canTransition(current.status, input.to, input.actor, current.paymentStatus === 'PAID')) {
+      throw AppError.conflict(
+        current.paymentStatus === 'PAID' && input.actor === 'BUYER' && input.to === 'CANCELLED'
+          ? 'This order is already paid — ask the shop to cancel and refund it'
+          : `An order that is ${current.status} cannot become ${input.to}`,
+        { status: current.status },
+      );
     }
 
     const moved = await this.orders.transition({
@@ -121,12 +151,25 @@ export class OrderService {
       throw AppError.conflict('This order has just been updated; reload and try again');
     }
 
+    // A cancelled order has no open payment window. Doing this here rather than in
+    // each caller means the buyer giving up, the shop refusing and the expiry job all
+    // close it the same way.
+    if (input.to === 'CANCELLED') {
+      await this.payments.cancelForOrder(moved.id);
+    }
+
     // The transition transaction has committed by now, and the job carries only the
     // id and the state it was queued for — the worker drops it if the order has moved
     // on since (ADR-013).
     await this.notifications.enqueue({ type: 'order-status', orderId: moved.id, status: input.to });
 
     return toOrderDto(moved, this.storage, input.actor);
+  }
+
+  private async requireForNotification(id: string): Promise<OrderRow> {
+    const order = await this.orders.findForNotification(id);
+    if (!order) throw AppError.notFound('Order not found');
+    return order;
   }
 
   private async requireForBuyer(buyerId: string, id: string): Promise<OrderRow> {

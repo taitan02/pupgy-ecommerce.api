@@ -4,6 +4,8 @@ import { AppError } from '../../../common/errors/app-error.js';
 import { StorageService } from '../../../infra/storage/storage.service.js';
 import { CartRepository, type CartLineRow } from '../../cart/repositories/cart.repository.js';
 import { AddressRepository, type AddressRecord } from '../../addresses/repositories/address.repository.js';
+import { PaymentAccountRepository } from '../../payments/repositories/payment-account.repository.js';
+import { PaymentService } from '../../payments/services/payment.service.js';
 import { CartItemIssue } from '../../cart/dto/cart.dto.js';
 import { evaluateLine, optionValuesOf } from '../../cart/services/availability.js';
 import { OrderRepository, OutOfStockError, type NewOrderLine } from '../repositories/order.repository.js';
@@ -30,6 +32,8 @@ export class CheckoutService {
     private readonly orders: OrderRepository,
     private readonly storage: StorageService,
     private readonly notifications: NotificationService,
+    private readonly paymentAccounts: PaymentAccountRepository,
+    private readonly paymentService: PaymentService,
   ) {}
 
   /**
@@ -64,7 +68,7 @@ export class CheckoutService {
       itemsSubtotal,
       shippingFee: SHIPPING_FLAT_FEE,
       total: itemsSubtotal + SHIPPING_FLAT_FEE,
-      paymentMethods: ['COD'],
+      paymentMethods: await this.methodsFor(dto.shopId),
       blocked: !address || items.some((item) => item.issue !== null),
     };
   }
@@ -98,6 +102,13 @@ export class CheckoutService {
       });
     }
 
+    // Checked before anything is written: a shop that has not configured SePay must
+    // not be able to receive a QR order, whatever the client sent.
+    const byTransfer = dto.paymentMethod === 'SEPAY_QR';
+    if (byTransfer && !(await this.paymentAccounts.findActiveForShop(dto.shopId))) {
+      throw AppError.conflict('This shop does not accept bank transfer');
+    }
+
     const itemsSubtotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
     const lines: NewOrderLine[] = items.map((item) => ({
       id: uuidv7(),
@@ -120,7 +131,8 @@ export class CheckoutService {
         code: generateOrderCode(),
         shopId: dto.shopId,
         buyerId: userId,
-        paymentMethod: 'COD',
+        paymentMethod: byTransfer ? 'SEPAY_QR' : 'COD',
+        status: byTransfer ? 'AWAITING_PAYMENT' : 'PENDING',
         recipientName: address.recipientName,
         phone: address.phone,
         provinceName: address.provinceName,
@@ -134,10 +146,19 @@ export class CheckoutService {
         lines,
       });
 
+      if (byTransfer) {
+        // The stock is already gone; this row is what gives it back if nobody pays.
+        await this.paymentService.open(order.id, order.shopId, order.total, order.code);
+      }
+
       // After the transaction, never inside it: a worker can pick a job up before the
       // commit lands and query for an order that does not exist yet (ADR-013).
       await this.notifications.enqueue({ type: 'order-placed', orderId: order.id });
-      await this.notifications.enqueue({ type: 'order-received', orderId: order.id });
+      // The shop is told when there is something to act on. For a transfer that is
+      // when the money lands, not when the buyer clicks — so the webhook sends it.
+      if (!byTransfer) {
+        await this.notifications.enqueue({ type: 'order-received', orderId: order.id });
+      }
 
       return this.result(order, userId);
     } catch (error) {
@@ -166,6 +187,12 @@ export class CheckoutService {
       order: toOrderDto(order, this.storage, 'BUYER'),
       remainingCartItems: await this.cart.countLines(userId),
     };
+  }
+
+  /** COD everywhere; transfer only where the shop can actually receive one. */
+  private async methodsFor(shopId: string): Promise<('COD' | 'SEPAY_QR')[]> {
+    const account = await this.paymentAccounts.findActiveForShop(shopId);
+    return account ? ['COD', 'SEPAY_QR'] : ['COD'];
   }
 
   private async resolveAddress(userId: string, addressId?: string): Promise<AddressRecord | null> {

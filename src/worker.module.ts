@@ -8,7 +8,10 @@ import { MailModule } from './infra/mail/mail.module.js';
 import { OrdersModule } from './modules/orders/orders.module.js';
 import { ShopsModule } from './modules/shops/shops.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
+import { PaymentsModule } from './modules/payments/payments.module.js';
 import { MailProcessor } from './modules/notifications/mail.processor.js';
+import { PaymentProcessor } from './modules/payments/payment.processor.js';
+import { PaymentExpiryService } from './modules/payments/services/payment-expiry.service.js';
 
 /**
  * The worker's module graph: infrastructure, the services a job needs to read, and the
@@ -31,7 +34,8 @@ import { MailProcessor } from './modules/notifications/mail.processor.js';
     AuthModule,
     ShopsModule,
     OrdersModule,
+    PaymentsModule,
   ],
-  providers: [MailProcessor],
+  providers: [MailProcessor, PaymentProcessor, PaymentExpiryService],
 })
 export class WorkerModule {}

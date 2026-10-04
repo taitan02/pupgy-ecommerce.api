@@ -179,6 +179,61 @@ moment and the email needs it — so that job alone is dropped the instant it is
 delivered, instead of being kept for the default day. Without that, a usable token sits
 readable in the queue long after the database only knows its hash.
 
+## Payments (Phase 8)
+
+COD is settled by the courier and needs no verification. A bank transfer is the
+opposite: the money arrives somewhere we cannot see, and the only evidence is a POST
+from a third party. ADR-014 has the reasoning; this is the shape.
+
+**Every shop connects its own SePay account.** The platform never receives a payment
+(ADR-001), so the bank account, the webhook URL and the HMAC secret are per shop.
+A shop that has not set this up is simply not offered QR at checkout — the preview
+returns the methods that shop can actually accept.
+
+**The webhook URL carries an opaque per-shop id**: `POST /webhooks/sepay/{webhookId}`.
+That solves an ordering problem rather than an authorisation one — the secret is per
+shop, so you must know the shop before you can verify anything, and nothing in the body
+may be trusted until the signature checks out. The id is not a secret; knowing it does
+not let anyone forge a signature.
+
+**Verification, exactly as SePay documents it:**
+
+| | |
+|---|---|
+| Headers | `X-SePay-Signature: sha256={hex}`, `X-SePay-Timestamp` |
+| Signed string | `{timestamp}.{raw body}` |
+| Encoding | hex, compared in constant time |
+| Replay window | 300 seconds either way |
+
+The raw body matters more than it looks. Parsing JSON and re-serialising it changes key
+order, whitespace and Unicode escaping — and this payload carries Vietnamese text — so
+the signature would never match. `createApp()` enables Nest's `rawBody` for exactly
+this.
+
+**The secret is encrypted, not hashed.** Every other secret here is hashed because we
+only ever compare it. Verifying an HMAC means recomputing it, which needs the real key
+back: hash what you compare, encrypt what you must replay.
+
+**Idempotency is not optional.** SePay retries up to seven times over five hours, so a
+repeat delivery is documented behaviour. The unique index on
+`(shop_id, provider_transaction_id)` decides, inside the same transaction that marks the
+payment paid — a check-then-write would let two concurrent deliveries both through.
+
+**Stock is held by the order, not by a reservation column.** A QR order starts in
+`AWAITING_PAYMENT` with the units already deducted; expiry cancels it and restocks
+through the same path as any other cancellation. A delayed job per order closes the
+window, and a sweeper every minute catches whatever the delayed job lost.
+
+### Testing it without SePay
+
+`test/helpers/sepay.ts` signs payloads with a known secret, so the full path —
+signature, replay window, dedupe, reconciliation, expiry — runs against the same code a
+real transfer reaches. Only the last hop, money actually moving in a bank, needs an
+account.
+
+For a real end-to-end test you need `API_PUBLIC_URL` pointing at a tunnel that forwards
+to port 3000, and that URL pasted into SePay as the webhook.
+
 ## Catalog model (Phase 4)
 
 `Product` → `ProductOption` (≤ 2) → `ProductOptionValue`, and `Sku` as the thing that

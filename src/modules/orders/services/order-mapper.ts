@@ -50,7 +50,7 @@ export function toListItemDto(
     shopSlug: row.shop.slug,
     buyerName: row.buyer.fullName ?? row.buyer.email,
     placedAt: row.placedAt.toISOString(),
-    allowedTransitions: allowedTransitions(row.status, actor),
+    allowedTransitions: allowedTransitions(row.status, actor, row.paymentStatus === 'PAID'),
   };
 }
 

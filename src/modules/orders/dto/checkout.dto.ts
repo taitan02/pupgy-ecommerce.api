@@ -1,10 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
-/** Only COD until Phase 8 wires SePay QR. The schema knows about SEPAY_QR; the
- *  contract must not offer a method the API cannot yet collect money with. */
 export enum PaymentMethodDto {
   COD = 'COD',
+  /** Offered only for shops that have configured their own SePay account (ADR-014).
+   *  The checkout preview says which methods a given shop actually accepts. */
+  SEPAY_QR = 'SEPAY_QR',
 }
 
 export class CheckoutPreviewDto {

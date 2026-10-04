@@ -9,6 +9,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { WorkerModule } from '../src/worker.module.js';
 import { MailProcessor } from '../src/modules/notifications/mail.processor.js';
 import { PrismaService } from '../src/infra/prisma/prisma.service.js';
+import { PAYMENT_QUEUE } from '../src/modules/payments/services/payment.queue.js';
 import { MAIL_QUEUE, type MailJob } from '../src/modules/notifications/notification.types.js';
 import { createShop, registerUser, uniqueSlug, url, type TestSession, createTestApp } from './helpers/auth-helpers.js';
 import { addressedTo, clearMailbox, messageHtml, waitForMessage } from './helpers/mailpit.js';
@@ -42,7 +43,9 @@ describe('Transactional email (e2e)', () => {
     // in those processes. Starting this file's worker on top of that backlog means the
     // job this file cares about queues behind a hundred others, and the test times out
     // waiting for an email that is merely late. Start from an empty queue.
-    await (app.get(getQueueToken(MAIL_QUEUE)) as Queue).obliterate({ force: true });
+    for (const name of [MAIL_QUEUE, PAYMENT_QUEUE]) {
+      await (app.get(getQueueToken(name)) as Queue).obliterate({ force: true });
+    }
 
     worker = await NestFactory.createApplicationContext(WorkerModule, { logger: false });
     processor = worker.get(MailProcessor);
@@ -70,10 +73,14 @@ describe('Transactional email (e2e)', () => {
   });
 
   afterAll(async () => {
-    // And drain on the way out, so a job left behind here is not delivered by the next
-    // spec file's worker to someone who is not expecting it.
-    await (app.get(getQueueToken(MAIL_QUEUE)) as Queue).obliterate({ force: true });
+    // Order matters: stop the processors first, then empty the queues, then close the
+    // app. Obliterating a queue a worker is still attached to leaves timers running
+    // and the process never exits — the suite hangs after the last assertion with
+    // every test green.
     await worker.close();
+    for (const name of [MAIL_QUEUE, PAYMENT_QUEUE]) {
+      await (app.get(getQueueToken(name)) as Queue).obliterate({ force: true });
+    }
     await app.close();
   });
 

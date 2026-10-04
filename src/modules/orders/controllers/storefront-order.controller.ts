@@ -17,6 +17,7 @@ import {
   OrderQueryDto,
   PlaceOrderResultDto,
 } from '../dto/order.dto.js';
+import { PaymentInstructionsDto } from '../../payments/dto/payment.dto.js';
 import { CurrentUser, RequireAudience } from '../../../common/decorators/auth.decorators.js';
 import type { AuthenticatedUser } from '../../auth/auth.types.js';
 
@@ -73,6 +74,16 @@ export class StorefrontOrderController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<OrderDto> {
     return this.orders.getForBuyer(user.id, id);
+  }
+
+  @Get('orders/:id/payment')
+  @ApiOperation({ summary: 'QR, bank details and the memo to use for a transfer order' })
+  @ApiOkResponse({ type: PaymentInstructionsDto })
+  payment(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<PaymentInstructionsDto> {
+    return this.orders.paymentFor(user.id, id);
   }
 
   @Post('orders/:id/cancel')

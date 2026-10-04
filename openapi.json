@@ -1818,6 +1818,7 @@
             "schema": {
               "type": "string",
               "enum": [
+                "AWAITING_PAYMENT",
                 "PENDING",
                 "CONFIRMED",
                 "SHIPPING",
@@ -1901,6 +1902,52 @@
           }
         ],
         "summary": "One order",
+        "tags": [
+          "storefront/orders"
+        ]
+      }
+    },
+    "/api/v1/storefront/orders/{id}/payment": {
+      "get": {
+        "operationId": "StorefrontOrderController_payment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentInstructionsDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "QR, bank details and the memo to use for a transfer order",
         "tags": [
           "storefront/orders"
         ]
@@ -2004,6 +2051,7 @@
             "schema": {
               "type": "string",
               "enum": [
+                "AWAITING_PAYMENT",
                 "PENDING",
                 "CONFIRMED",
                 "SHIPPING",
@@ -2783,6 +2831,107 @@
         "summary": "Delete an address; the default moves to the next one",
         "tags": [
           "storefront/addresses"
+        ]
+      }
+    },
+    "/api/v1/seller/payment-account": {
+      "get": {
+        "operationId": "SellerPaymentController_get",
+        "parameters": [
+          {
+            "name": "x-shop-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "null when not set up yet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentAccountDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "The shop’s bank details and webhook URL",
+        "tags": [
+          "seller/payments"
+        ]
+      },
+      "put": {
+        "description": "The webhook secret is write-only: send it to set or rotate it, omit it to keep the stored one. It is never returned.",
+        "operationId": "SellerPaymentController_upsert",
+        "parameters": [
+          {
+            "name": "x-shop-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertPaymentAccountDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentAccountDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Create or update it",
+        "tags": [
+          "seller/payments"
         ]
       }
     }
@@ -4274,7 +4423,8 @@
           "paymentMethod": {
             "type": "string",
             "enum": [
-              "COD"
+              "COD",
+              "SEPAY_QR"
             ],
             "default": "COD"
           },
@@ -4371,6 +4521,7 @@
           "status": {
             "type": "string",
             "enum": [
+              "AWAITING_PAYMENT",
               "PENDING",
               "CONFIRMED",
               "SHIPPING",
@@ -4430,6 +4581,7 @@
             "items": {
               "type": "string",
               "enum": [
+                "AWAITING_PAYMENT",
                 "PENDING",
                 "CONFIRMED",
                 "SHIPPING",
@@ -4461,7 +4613,8 @@
             "type": "string",
             "enum": [
               "BUYER",
-              "SELLER"
+              "SELLER",
+              "SYSTEM"
             ],
             "nullable": true
           },
@@ -4548,6 +4701,7 @@
           "status": {
             "type": "string",
             "enum": [
+              "AWAITING_PAYMENT",
               "PENDING",
               "CONFIRMED",
               "SHIPPING",
@@ -4607,6 +4761,7 @@
             "items": {
               "type": "string",
               "enum": [
+                "AWAITING_PAYMENT",
                 "PENDING",
                 "CONFIRMED",
                 "SHIPPING",
@@ -4652,6 +4807,57 @@
           "nextCursor"
         ]
       },
+      "PaymentInstructionsDto": {
+        "type": "object",
+        "properties": {
+          "qrImageUrl": {
+            "type": "string",
+            "description": "VietQR image to show the buyer"
+          },
+          "bankCode": {
+            "type": "string",
+            "example": "Vietcombank"
+          },
+          "accountNumber": {
+            "type": "string"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number",
+            "description": "Integer VND — must match exactly"
+          },
+          "reference": {
+            "type": "string",
+            "description": "What the buyer must put in the transfer memo"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "After this the order is cancelled and restocked"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "PAID",
+              "EXPIRED",
+              "CANCELLED"
+            ]
+          }
+        },
+        "required": [
+          "qrImageUrl",
+          "bankCode",
+          "accountNumber",
+          "accountName",
+          "amount",
+          "reference",
+          "expiresAt",
+          "status"
+        ]
+      },
       "CancelOrderDto": {
         "type": "object",
         "properties": {
@@ -4664,6 +4870,10 @@
       "OrderSummaryDto": {
         "type": "object",
         "properties": {
+          "awaitingPayment": {
+            "type": "number",
+            "description": "QR orders whose transfer has not arrived yet"
+          },
           "pending": {
             "type": "number"
           },
@@ -4681,6 +4891,7 @@
           }
         },
         "required": [
+          "awaitingPayment",
           "pending",
           "confirmed",
           "shipping",
@@ -4979,6 +5190,72 @@
             "type": "boolean"
           }
         }
+      },
+      "PaymentAccountDto": {
+        "type": "object",
+        "properties": {
+          "bankCode": {
+            "type": "string"
+          },
+          "accountNumberMasked": {
+            "type": "string",
+            "description": "Masked — only the last four digits"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "webhookUrl": {
+            "type": "string",
+            "description": "Paste this into SePay as the webhook URL. It identifies the shop, nothing more."
+          },
+          "hasSecret": {
+            "type": "boolean",
+            "description": "Whether a secret has been stored. The secret itself is never sent back."
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "bankCode",
+          "accountNumberMasked",
+          "accountName",
+          "webhookUrl",
+          "hasSecret",
+          "isActive"
+        ]
+      },
+      "UpsertPaymentAccountDto": {
+        "type": "object",
+        "properties": {
+          "bankCode": {
+            "type": "string",
+            "example": "Vietcombank",
+            "description": "SePay's short bank name"
+          },
+          "accountNumber": {
+            "type": "string",
+            "example": "0010000000355"
+          },
+          "accountName": {
+            "type": "string",
+            "example": "NGUYEN VAN A"
+          },
+          "webhookSecret": {
+            "type": "string",
+            "minLength": 16,
+            "description": "The HMAC secret from SePay. Write-only: send it to set or rotate it, omit it to leave the stored one alone. It is never returned."
+          },
+          "isActive": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [
+          "bankCode",
+          "accountNumber",
+          "accountName"
+        ]
       },
       "ProblemDto": {
         "type": "object",

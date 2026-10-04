@@ -12,6 +12,7 @@ import type {
 /** class-validator needs a runtime enum, and the generated file is not part of the
  *  contract layer. Same split as ProductStatusDto in the catalog. */
 export enum OrderStatusDto {
+  AWAITING_PAYMENT = 'AWAITING_PAYMENT',
   PENDING = 'PENDING',
   CONFIRMED = 'CONFIRMED',
   SHIPPING = 'SHIPPING',
@@ -73,7 +74,7 @@ export class OrderDto extends OrderListItemDto {
   @ApiProperty({ nullable: true, type: String }) note!: string | null;
   @ApiProperty() itemsSubtotal!: number;
   @ApiProperty() shippingFee!: number;
-  @ApiProperty({ enum: ['BUYER', 'SELLER'], nullable: true })
+  @ApiProperty({ enum: ['BUYER', 'SELLER', 'SYSTEM'], nullable: true })
   cancelledBy!: CancelledBy | null;
   @ApiProperty({ nullable: true, type: String }) cancelReason!: string | null;
   @ApiProperty({ format: 'date-time', nullable: true, type: String }) confirmedAt!: string | null;
@@ -89,6 +90,8 @@ export class OrderListPageDto {
 
 /** Tab counters for the order screens. */
 export class OrderSummaryDto {
+  @ApiProperty({ description: 'QR orders whose transfer has not arrived yet' })
+  awaitingPayment!: number;
   @ApiProperty() pending!: number;
   @ApiProperty() confirmed!: number;
   @ApiProperty() shipping!: number;

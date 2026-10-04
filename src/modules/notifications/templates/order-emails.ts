@@ -16,7 +16,7 @@ export interface OrderEmailData {
   itemsSubtotal: number;
   shippingFee: number;
   total: number;
-  cancelledBy: 'BUYER' | 'SELLER' | null;
+  cancelledBy: 'BUYER' | 'SELLER' | 'SYSTEM' | null;
   cancelReason: string | null;
 }
 
@@ -89,7 +89,12 @@ export function orderStatusEmail(
   orderUrl: string,
 ): MailMessage | null {
   if (status === 'CANCELLED') {
-    const who = order.cancelledBy === 'SELLER' ? 'Shop đã huỷ đơn này' : 'Bạn đã huỷ đơn này';
+    const who =
+      order.cancelledBy === 'SELLER'
+        ? 'Shop đã huỷ đơn này'
+        : order.cancelledBy === 'SYSTEM'
+          ? 'Đơn đã tự huỷ vì quá hạn thanh toán'
+          : 'Bạn đã huỷ đơn này';
     return {
       to: order.buyerEmail,
       subject: `Đơn ${order.code} đã huỷ`,

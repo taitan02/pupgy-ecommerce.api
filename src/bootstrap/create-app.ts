@@ -19,6 +19,11 @@ export async function createApp(): Promise<NestExpressApplication> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: new NestPinoLogger(),
     bufferLogs: true,
+    // Keeps the untouched request bytes on `request.rawBody`. The SePay webhook
+    // signature covers exactly what was sent, and JSON that has been parsed and
+    // re-serialised is not it — key order, whitespace and Unicode escaping all move,
+    // and this payload carries Vietnamese text (ADR-014).
+    rawBody: true,
   });
 
   const config = app.get<ConfigService<Env, true>>(ConfigService);
