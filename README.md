@@ -179,60 +179,63 @@ moment and the email needs it — so that job alone is dropped the instant it is
 delivered, instead of being kept for the default day. Without that, a usable token sits
 readable in the queue long after the database only knows its hash.
 
-## Payments (Phase 8)
+## Payments and escrow (Phase 9, supersedes Phase 8)
 
-COD is settled by the courier and needs no verification. A bank transfer is the
-opposite: the money arrives somewhere we cannot see, and the only evidence is a POST
-from a third party. ADR-014 has the reasoning; this is the shape.
+**The platform holds the money** (ADR-015, which supersedes ADR-001). Buyers transfer
+to one platform SePay account; the money is held for the shop and released when the
+order completes, minus commission. Shops withdraw from an available balance.
 
-**Every shop connects its own SePay account.** The platform never receives a payment
-(ADR-001), so the bank account, the webhook URL and the HMAC secret are per shop.
-A shop that has not set this up is simply not offered QR at checkout — the preview
-returns the methods that shop can actually accept.
+> This simulates a payment intermediary. Holding and transferring other people's money
+> in Vietnam is a licensed activity regulated by the State Bank; this is a portfolio
+> project, not an application for a licence, and it is not run with real customer funds.
 
-**The webhook URL carries an opaque per-shop id**: `POST /webhooks/sepay/{webhookId}`.
-That solves an ordering problem rather than an authorisation one — the secret is per
-shop, so you must know the shop before you can verify anything, and nothing in the body
-may be trusted until the signature checks out. The id is not a secret; knowing it does
-not let anyone forge a signature.
+### The ledger is the whole design
 
-**Verification, exactly as SePay documents it:**
+There is **no balance column anywhere**. A balance is the sum of `ledger_entries`,
+which are append-only: a correction is written as its own opposite entry, so the history
+of the mistake survives. A stored total can be wrong with no way to find out when it
+went wrong — two concurrent writes, a retried webhook, a refund applied twice — and
+every number derived from it is wrong from then on.
 
-| | |
+| Event | Entries |
 |---|---|
-| Headers | `X-SePay-Signature: sha256={hex}`, `X-SePay-Timestamp` |
-| Signed string | `{timestamp}.{raw body}` |
-| Encoding | hex, compared in constant time |
-| Replay window | 300 seconds either way |
+| Transfer settles | `+ SHOP_PENDING` (order total) |
+| Order completes | `− SHOP_PENDING`, `+ SHOP_AVAILABLE` (total − commission), `+ PLATFORM_REVENUE` |
+| COD order completes | `− SHOP_AVAILABLE` (commission only — no money ever reached us) |
+| Order refunded | `− SHOP_PENDING`, or `− SHOP_AVAILABLE` if already released |
+| Payout requested | `− SHOP_AVAILABLE` |
 
-The raw body matters more than it looks. Parsing JSON and re-serialising it changes key
-order, whitespace and Unicode escaping — and this payload carries Vietnamese text — so
-the signature would never match. `createApp()` enables Nest's `rawBody` for exactly
-this.
+A balance can legitimately be **negative**: COD cash goes straight to the shop, so the
+commission on it is a debt.
 
-**The secret is encrypted, not hashed.** Every other secret here is hashed because we
-only ever compare it. Verifying an HMAC means recomputing it, which needs the real key
-back: hash what you compare, encrypt what you must replay.
+### Where the locking changes
 
-**Idempotency is not optional.** SePay retries up to seven times over five hours, so a
-repeat delivery is documented behaviour. The unique index on
-`(shop_id, provider_transaction_id)` decides, inside the same transaction that marks the
-payment paid — a check-then-write would let two concurrent deliveries both through.
+Everywhere else a race is closed by putting the condition into the write —
+`WHERE stock >= $1`, `WHERE status = $from`, `WHERE released_at IS NULL`. That works
+because the guarded quantity lives in one row.
 
-**Stock is held by the order, not by a reservation column.** A QR order starts in
-`AWAITING_PAYMENT` with the units already deducted; expiry cancels it and restocks
-through the same path as any other cancellation. A delayed job per order closes the
-window, and a sweeper every minute catches whatever the delayed job lost.
+A balance does not: it is the sum of many rows, and there is nothing to attach the
+condition to. A payout request therefore takes `SELECT ... FOR UPDATE` on the shop row,
+which makes payout requests for that shop serial. Without it two concurrent requests
+both read "enough" and the shop is paid twice — there is a test for exactly that.
 
-### Testing it without SePay
+### DELIVERED is not COMPLETED
 
-`test/helpers/sepay.ts` signs payloads with a known secret, so the full path —
-signature, replay window, dedupe, reconciliation, expiry — runs against the same code a
-real transfer reaches. Only the last hop, money actually moving in a bank, needs an
-account.
+`DELIVERED` is the courier's claim; `COMPLETED` is the buyer accepting the goods, and
+that is what releases the money. Most buyers never press the button, so delivery starts
+a clock (`AUTO_RELEASE_DAYS`) after which a job releases anyway.
 
-For a real end-to-end test you need `API_PUBLIC_URL` pointing at a tunnel that forwards
-to port 3000, and that URL pasted into SePay as the webhook.
+### The webhook
+
+Unchanged from ADR-014 except that the secret now comes from the environment, because
+there is one SePay account and it is the platform's. HMAC-SHA256 over
+`{timestamp}.{raw body}`, hex, 300-second replay window, deduplicated by the unique
+provider transaction id inside the settling transaction.
+
+`test/helpers/sepay.ts` signs payloads with a known secret, so verification, replay,
+dedupe, reconciliation, escrow and release all run against the code a real transfer
+reaches. Only the last hop — money moving in a bank — needs a real account and a tunnel
+pointed at `API_PUBLIC_URL`.
 
 ## Catalog model (Phase 4)
 

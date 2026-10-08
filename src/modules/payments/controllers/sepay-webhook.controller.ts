@@ -1,4 +1,4 @@
-import { Controller, HttpCode, Param, Post, Req } from '@nestjs/common';
+import { Controller, HttpCode, Post, Req } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import type { RawBodyRequest } from '@nestjs/common';
 import type { Request } from 'express';
@@ -8,6 +8,10 @@ import type { WebhookAckDto } from '../dto/payment.dto.js';
 
 /**
  * SePay's callback. Public by necessity and authenticated by signature, not by token.
+ *
+ * One path, not one per shop: there is a single SePay account and it belongs to the
+ * platform (ADR-015). The secret comes from the environment, so there is nothing in the
+ * URL to resolve before the signature can be checked.
  *
  * Excluded from the published contract: it is not an endpoint anyone integrates
  * against, and the shape is SePay's to define, not ours to promise.
@@ -23,12 +27,9 @@ import type { WebhookAckDto } from '../dto/payment.dto.js';
 export class SepayWebhookController {
   constructor(private readonly webhook: SepayWebhookService) {}
 
-  @Post(':webhookId')
+  @Post()
   @HttpCode(200)
-  async receive(
-    @Param('webhookId') webhookId: string,
-    @Req() request: RawBodyRequest<Request>,
-  ): Promise<WebhookAckDto> {
+  async receive(@Req() request: RawBodyRequest<Request>): Promise<WebhookAckDto> {
     // Without this the signature would be computed over re-serialised JSON and never
     // match. If it is ever missing, that is a bootstrap misconfiguration, not a
     // malformed request — so it fails loudly rather than as "invalid signature".
@@ -36,11 +37,7 @@ export class SepayWebhookController {
       throw new Error('rawBody is not enabled — see createApp()');
     }
 
-    await this.webhook.handle({
-      webhookId,
-      rawBody: request.rawBody,
-      headers: request.headers,
-    });
+    await this.webhook.handle({ rawBody: request.rawBody, headers: request.headers });
 
     return { success: true };
   }

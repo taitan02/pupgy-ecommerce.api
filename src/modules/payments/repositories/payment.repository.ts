@@ -5,32 +5,47 @@ import { PrismaService } from '../../../infra/prisma/prisma.service.js';
 
 export interface PaymentRecord {
   id: string;
-  orderId: string;
-  shopId: string;
+  code: string;
+  buyerId: string;
   amount: number;
   status: 'PENDING' | 'PAID' | 'EXPIRED' | 'CANCELLED';
-  reference: string;
   expiresAt: Date;
   paidAt: Date | null;
   providerTransactionId: string | null;
 }
 
+/** An order as the settlement path needs it. */
+export interface CoveredOrder {
+  id: string;
+  shopId: string;
+  total: number;
+  itemsSubtotal: number;
+  commissionRate: number;
+  paymentMethod: 'COD' | 'SEPAY_QR';
+}
+
 const FIELDS = {
   id: true,
-  orderId: true,
-  shopId: true,
+  code: true,
+  buyerId: true,
   amount: true,
   status: true,
-  reference: true,
   expiresAt: true,
   paidAt: true,
   providerTransactionId: true,
 } as const;
 
-/** The outcome of handing a webhook to the repository. Every one of these is a normal
- *  thing that happens in production, which is why none of them is an exception. */
+const COVERED_ORDER = {
+  id: true,
+  shopId: true,
+  total: true,
+  itemsSubtotal: true,
+  commissionRate: true,
+  paymentMethod: true,
+} as const;
+
 export type SettlementResult =
-  | { outcome: 'paid'; payment: PaymentRecord }
+  | { outcome: 'paid'; payment: PaymentRecord; orders: CoveredOrder[] }
   | { outcome: 'duplicate' }
   | { outcome: 'no-match' }
   | { outcome: 'amount-mismatch'; expected: number; received: number }
@@ -42,54 +57,65 @@ export class PaymentRepository {
 
   create(data: {
     id: string;
-    orderId: string;
-    shopId: string;
+    code: string;
+    buyerId: string;
     amount: number;
-    reference: string;
     expiresAt: Date;
+    orderIds: string[];
   }): Promise<PaymentRecord> {
-    return this.prisma.payment.create({ data, select: FIELDS });
+    const { orderIds, ...payment } = data;
+    return this.prisma.payment.create({
+      data: { ...payment, orders: { connect: orderIds.map((id) => ({ id })) } },
+      select: FIELDS,
+    });
   }
 
-  findByOrder(orderId: string): Promise<PaymentRecord | null> {
-    return this.prisma.payment.findUnique({ where: { orderId }, select: FIELDS });
+  findById(id: string): Promise<PaymentRecord | null> {
+    return this.prisma.payment.findUnique({ where: { id }, select: FIELDS });
+  }
+
+  findForOrder(orderId: string): Promise<PaymentRecord | null> {
+    return this.prisma.payment
+      .findFirst({ where: { orders: { some: { id: orderId } } }, select: FIELDS });
+  }
+
+  ordersOf(paymentId: string, tx?: Prisma.TransactionClient): Promise<CoveredOrder[]> {
+    return (tx ?? this.prisma).order.findMany({
+      where: { paymentId },
+      select: COVERED_ORDER,
+    });
   }
 
   /**
-   * Settles one verified webhook: records the event, matches it to a pending payment,
-   * marks it paid and moves the order — all in one transaction.
+   * Settles one verified webhook inside a single transaction: record the event, match a
+   * pending payment by its code, mark it paid and move every order it covers.
    *
-   * The deduplication is the unique index on (shop, provider transaction id), not a
-   * prior lookup. SePay retries up to seven times over five hours, so two deliveries
-   * landing at once is ordinary; a check-then-write would let both through and pay the
-   * same order twice. The second insert loses, and losing is a success here — the
-   * money was already recorded.
+   * The deduplication is the unique index on the provider transaction id, not a prior
+   * lookup. SePay retries up to seven times over five hours, so two deliveries landing
+   * together is ordinary — and a check-then-write would credit the same money twice.
    */
   async settle(input: {
-    shopId: string;
     providerTransactionId: string;
     amount: number;
     memo: string;
     payload: Prisma.InputJsonValue;
     matchReference: (memo: string, reference: string) => boolean;
+    onPaid: (tx: Prisma.TransactionClient, orders: CoveredOrder[]) => Promise<void>;
   }): Promise<SettlementResult> {
     try {
       return await this.prisma.$transaction(async (tx) => {
         const candidates = await tx.payment.findMany({
-          where: { shopId: input.shopId, status: 'PENDING' },
+          where: { status: 'PENDING' },
           orderBy: { id: 'desc' },
-          // The memo decides which one; this bound just stops an unmatched transfer
-          // from scanning a shop's entire history.
-          take: 200,
+          take: 500,
           select: FIELDS,
         });
 
-        const payment = candidates.find((row) => input.matchReference(input.memo, row.reference));
+        const payment = candidates.find((row) => input.matchReference(input.memo, row.code));
 
         await tx.paymentEvent.create({
           data: {
             id: uuidv7(),
-            shopId: input.shopId,
             providerTransactionId: input.providerTransactionId,
             payload: input.payload,
             paymentId: payment?.id ?? null,
@@ -119,22 +145,22 @@ export class PaymentRepository {
         if (claimed.count === 0) return { outcome: 'not-pending', status: payment.status } as const;
 
         await tx.order.updateMany({
-          where: { id: payment.orderId, status: 'AWAITING_PAYMENT' },
+          where: { paymentId: payment.id, status: 'AWAITING_PAYMENT' },
           data: { status: 'PENDING', paymentStatus: 'PAID' },
         });
 
-        return { outcome: 'paid', payment } as const;
+        const orders = await this.ordersOf(payment.id, tx);
+        // The ledger is written here, in the same transaction that moved the orders.
+        await input.onPaid(tx, orders);
+
+        return { outcome: 'paid', payment, orders } as const;
       });
     } catch (error) {
-      // P2002 on (shop, transaction id): another delivery of the same webhook got
-      // there first and the whole transaction rolled back. Nothing to do.
       if (isUniqueViolation(error)) return { outcome: 'duplicate' };
       throw error;
     }
   }
 
-  /** Payments whose window has closed and whose order is still unpaid. Bounded,
-   *  because a sweeper that tries to fix everything at once fixes nothing. */
   findExpired(limit: number): Promise<PaymentRecord[]> {
     return this.prisma.payment.findMany({
       where: { status: 'PENDING', expiresAt: { lt: new Date() } },
@@ -144,8 +170,8 @@ export class PaymentRepository {
     });
   }
 
-  /** Closes the payment, with the current status in the WHERE clause so a transfer
-   *  that arrived in the same second cannot be overwritten by the sweeper. */
+  /** Closes the window, with the current status in the WHERE clause so a transfer that
+   *  arrived in the same second cannot be overwritten by the sweeper. */
   async markExpired(id: string): Promise<boolean> {
     const result = await this.prisma.payment.updateMany({
       where: { id, status: 'PENDING' },
@@ -154,9 +180,9 @@ export class PaymentRepository {
     return result.count === 1;
   }
 
-  async markCancelled(orderId: string): Promise<void> {
+  async markCancelledForOrder(orderId: string): Promise<void> {
     await this.prisma.payment.updateMany({
-      where: { orderId, status: 'PENDING' },
+      where: { orders: { some: { id: orderId } }, status: 'PENDING' },
       data: { status: 'CANCELLED' },
     });
   }

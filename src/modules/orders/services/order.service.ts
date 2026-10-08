@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { AppError } from '../../../common/errors/app-error.js';
 import { toCursorPage, type CursorPageDto } from '../../../common/dto/cursor-page.dto.js';
+import { logger } from '../../../infra/logger/logger.js';
 import { StorageService } from '../../../infra/storage/storage.service.js';
 import { NotificationService } from '../../notifications/notification.service.js';
 import { PaymentService } from '../../payments/services/payment.service.js';
+import { ReleaseService } from '../../payments/services/release.service.js';
 import { OrderRepository, type OrderRow } from '../repositories/order.repository.js';
 import { canTransition, RESTOCKS_ON_CANCEL, type Actor } from '../order-state.js';
 import { toListItemDto, toOrderDto } from './order-mapper.js';
@@ -17,6 +19,7 @@ export class OrderService {
     private readonly storage: StorageService,
     private readonly notifications: NotificationService,
     private readonly payments: PaymentService,
+    private readonly release: ReleaseService,
   ) {}
 
   // ---------- buyer ----------
@@ -38,10 +41,38 @@ export class OrderService {
    *  is enough to pay somebody else's order by accident. */
   async paymentFor(buyerId: string, orderId: string) {
     await this.requireForBuyer(buyerId, orderId);
-    const payment = await this.payments.findByOrder(orderId);
+    const payment = await this.payments.findForOrder(orderId);
     if (!payment) throw AppError.notFound('This order is not paid by transfer');
 
     return this.payments.instructionsFor(payment);
+  }
+
+  /**
+   * The buyer accepting the goods. This — not the courier's DELIVERED — is what
+   * releases the shop's money, so it goes through ReleaseService rather than the
+   * ordinary transition: completing the order and crediting the shop have to commit
+   * together (ADR-015).
+   */
+  async completeAsBuyer(buyerId: string, id: string): Promise<OrderDto> {
+    const order = await this.requireForBuyer(buyerId, id);
+
+    // Already done is not an error. A double tap, or the auto-release job having got
+    // there first, should look like success to the person pressing the button — the
+    // property that matters is that the shop is not paid twice, and the release
+    // transaction guarantees that on its own.
+    if (order.status === 'COMPLETED') return toOrderDto(order, this.storage, 'BUYER');
+
+    if (!canTransition(order.status, 'COMPLETED', 'BUYER')) {
+      throw AppError.conflict('Only a delivered order can be confirmed');
+    }
+
+    if (!(await this.release.complete(id))) {
+      // The auto-release job reached it first. Nothing is wrong and nothing is owed
+      // twice; the buyer just sees the order already completed.
+      logger.info({ orderId: id }, 'order was already completed when the buyer confirmed');
+    }
+
+    return this.getForBuyer(buyerId, id);
   }
 
   /** The buyer changing their mind, which is only allowed while the shop has not
@@ -92,6 +123,7 @@ export class OrderService {
       confirmed: counts.CONFIRMED,
       shipping: counts.SHIPPING,
       delivered: counts.DELIVERED,
+      completed: counts.COMPLETED,
       cancelled: counts.CANCELLED,
     };
   }
@@ -156,6 +188,9 @@ export class OrderService {
     // close it the same way.
     if (input.to === 'CANCELLED') {
       await this.payments.cancelForOrder(moved.id);
+      // Money that was taken has to go back. Does nothing for an unpaid order, and
+      // knows the difference between reversing a hold and reversing a credit.
+      await this.release.refund(moved.id);
     }
 
     // The transition transaction has committed by now, and the job carries only the

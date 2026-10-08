@@ -56,6 +56,7 @@ model User {
   addresses   Address[]
   cartItems   CartItem[]
   orders      Order[]
+  payments    Payment[]
   passwordResets PasswordResetToken[]
 
   @@map("users")
@@ -102,8 +103,9 @@ model Shop {
   members  ShopMember[]
   products Product[]
   orders   Order[]
-  paymentAccount ShopPaymentAccount?
-  paymentEvents  PaymentEvent[]
+  payoutAccount ShopPayoutAccount?
+  ledger        LedgerEntry[]
+  payouts       Payout[]
 
   @@map("shops")
 }
@@ -371,6 +373,9 @@ enum OrderStatus {
   CONFIRMED
   SHIPPING
   DELIVERED
+  /// The buyer accepted the goods, or the automatic window closed. This — not
+  /// DELIVERED — is what releases the shop's money (ADR-015).
+  COMPLETED
   CANCELLED
 
   @@map("order_status")
@@ -445,6 +450,19 @@ model Order {
   deliveredAt DateTime? @map("delivered_at") @db.Timestamptz(3)
   cancelledAt DateTime? @map("cancelled_at") @db.Timestamptz(3)
 
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(3)
+
+  /// Set when the shop's share leaves escrow, so a release can never run twice.
+  releasedAt DateTime? @map("released_at") @db.Timestamptz(3)
+
+  /// Basis points, snapshotted at placement. Changing the platform's rate must not
+  /// rewrite what a shop was owed on an order placed last month.
+  commissionRate Int @map("commission_rate")
+
+  /// The payment that covers this order. Null for COD, where no money reaches the
+  /// platform. One payment may cover several orders (ADR-015).
+  paymentId String? @map("payment_id") @db.Uuid
+
   cancelledBy  CancelledBy? @map("cancelled_by")
   cancelReason String?      @map("cancel_reason") @db.VarChar(200)
 
@@ -457,10 +475,11 @@ model Order {
 
   shop  Shop @relation(fields: [shopId], references: [id], onDelete: Restrict)
   buyer User @relation(fields: [buyerId], references: [id], onDelete: Restrict)
+  payment Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
 
   items     OrderItem[]
   movements InventoryMovement[]
-  payment   Payment?
+  ledger    LedgerEntry[]
 
   @@unique([buyerId, idempotencyKey])
   // Same composite trick as products: lets a line reference (order_id, shop_id)
@@ -470,6 +489,9 @@ model Order {
   // so ordering by id is ordering by time and the cursor needs no second column.
   @@index([shopId, status, id])
   @@index([buyerId, id])
+  @@index([paymentId])
+  // The auto-release sweeper's query: delivered, not yet released, long enough ago.
+  @@index([status, releasedAt])
   @@map("orders")
 }
 
@@ -560,96 +582,173 @@ enum PaymentRecordStatus {
   @@map("payment_record_status")
 }
 
-/// A shop's own SePay account: the bank account buyers transfer into, and the secret
-/// that proves a webhook really came from SePay.
+
+
+
+/// Where the platform sends a shop's money when they withdraw.
 ///
-/// One per shop, because the platform never receives a payment (ADR-001). A shop
-/// without a row here is simply not offered QR at checkout.
-model ShopPaymentAccount {
+/// This is the row ADR-014 created for the opposite purpose — buyers used to transfer
+/// into it. Under escrow the direction reverses: the platform receives, and this is the
+/// destination (ADR-015). The webhook secret is gone from here, because there is now
+/// one SePay account and it belongs to the platform.
+model ShopPayoutAccount {
   id     String @id @db.Uuid
   shopId String @unique @map("shop_id") @db.Uuid
 
-  /// SePay's short bank name, e.g. "Vietcombank" — it goes straight into the QR URL.
   bankCode      String @map("bank_code") @db.VarChar(40)
   accountNumber String @map("account_number") @db.VarChar(40)
-  /// Shown next to the QR so a buyer can see who they are paying.
   accountName   String @map("account_name") @db.VarChar(120)
 
-  /// The random path segment in this shop's webhook URL. It exists to choose which
-  /// secret to verify against before any payload can be trusted — it is not a
-  /// credential, and knowing it does not let anyone forge a signature.
-  webhookId String @unique @map("webhook_id") @db.VarChar(64)
-
-  /// AES-256-GCM, not a hash. Verifying an HMAC means recomputing it, which needs the
-  /// real key back — hash what you only ever compare, encrypt what you must replay.
-  webhookSecretCipher String @map("webhook_secret_cipher") @db.VarChar(500)
-
-  /// The merchant can switch QR off without deleting their bank details.
-  isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
-  @@map("shop_payment_accounts")
+  @@map("shop_payout_accounts")
 }
 
-/// The money side of one order. Separate from the order because an order is a
-/// commitment to ship and a payment is a claim about a bank transfer; they fail,
-/// expire and get argued about independently.
+/// One attempt to pay for one or more orders.
+///
+/// A cart spanning three shops is three orders and one payment: the orders stay per
+/// shop because a shop ships its own parcel, but the money is unified because a buyer
+/// makes one transfer (ADR-015).
 model Payment {
-  id      String @id @db.Uuid
-  orderId String @unique @map("order_id") @db.Uuid
-  shopId  String @map("shop_id") @db.Uuid
+  id String @id @db.Uuid
+  /// What the buyer puts in the transfer memo, and what the webhook matches on.
+  code String @unique @db.VarChar(20)
 
-  /// Integer VND, copied from the order. The webhook must match this exactly: a
-  /// partial transfer is a conversation, not a paid order.
-  amount Int
-  status PaymentRecordStatus @default(PENDING)
+  buyerId String @map("buyer_id") @db.Uuid
+  /// Integer VND. The sum of its orders' totals, fixed when the payment is opened.
+  amount  Int
+  status  PaymentRecordStatus @default(PENDING)
 
-  /// What the buyer is told to put in the transfer memo, and what we look for in the
-  /// webhook's `content`. The order code, since that is what the buyer already sees.
-  reference String @db.VarChar(32)
-
-  /// When the hold on the stock runs out.
   expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
   paidAt    DateTime? @map("paid_at") @db.Timestamptz(3)
 
-  /// SePay's own transaction id, written at the moment the payment is accepted.
   providerTransactionId String? @map("provider_transaction_id") @db.VarChar(64)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  buyer  User    @relation(fields: [buyerId], references: [id], onDelete: Restrict)
+  orders Order[]
 
   @@index([status, expiresAt])
   @@map("payments")
 }
 
-/// Every webhook body we accepted, kept raw.
+/// Every webhook body the platform accepted, kept raw.
 ///
-/// The unique index on (shop, provider transaction) is the deduplication: SePay
-/// retries up to seven times over five hours, so a repeated delivery is documented
-/// behaviour, not an edge case. The insert and the payment update happen in one
-/// transaction, so the index — not a prior check — decides who wins (ADR-014).
+/// No shop id any more: there is one SePay account and it is the platform's. The unique
+/// provider transaction id is the deduplication, and it is written in the same
+/// transaction that marks the payment paid (ADR-015).
 model PaymentEvent {
-  id     String @id @db.Uuid
-  shopId String @map("shop_id") @db.Uuid
+  id String @id @db.Uuid
 
-  providerTransactionId String @map("provider_transaction_id") @db.VarChar(64)
-  /// Exactly what arrived. Disputes are settled against this, not against our
-  /// interpretation of it.
-  payload Json
-  /// The payment it was matched to, or null when nothing matched — an unmatched
-  /// transfer is still evidence and still worth keeping.
-  paymentId String? @map("payment_id") @db.Uuid
+  providerTransactionId String @unique @map("provider_transaction_id") @db.VarChar(64)
+  payload               Json
+  paymentId             String? @map("payment_id") @db.Uuid
 
   receivedAt DateTime @default(now()) @map("received_at") @db.Timestamptz(3)
 
-  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
-
-  @@unique([shopId, providerTransactionId])
-  @@index([shopId, receivedAt])
+  @@index([receivedAt])
   @@map("payment_events")
+}
+
+enum LedgerAccount {
+  /// Money the platform is holding for a shop and has not released yet.
+  SHOP_PENDING
+  /// Money the shop may withdraw.
+  SHOP_AVAILABLE
+  /// The platform's commission, recorded per shop so it can be explained.
+  PLATFORM_REVENUE
+
+  @@map("ledger_account")
+}
+
+enum LedgerReason {
+  ORDER_PAID
+  ORDER_RELEASED
+  COMMISSION
+  ORDER_REFUNDED
+  /// COD money never reaches the platform, so the shop owes the fee. This is the
+  /// debit that makes a balance legitimately negative (ADR-015).
+  COD_COMMISSION_DUE
+  PAYOUT_RESERVED
+  PAYOUT_RETURNED
+
+  @@map("ledger_reason")
+}
+
+/// One movement of money, append-only.
+///
+/// There is no balance column anywhere in this system. A balance is the sum of these
+/// rows, because a stored number can be wrong with no way to find out when it went
+/// wrong — two concurrent updates, a retried webhook, a refund applied twice, and the
+/// figure is simply incorrect from then on. Same instinct as InventoryMovement
+/// (ADR-012), applied to money, where it matters more.
+///
+/// Entries are never updated or deleted. A mistake is corrected by writing its
+/// opposite, so the history of the mistake survives.
+model LedgerEntry {
+  id      String @id @db.Uuid
+  shopId  String @map("shop_id") @db.Uuid
+  account LedgerAccount
+  /// Signed integer VND. Negative takes money out of the account.
+  amount  Int
+  reason  LedgerReason
+
+  orderId  String? @map("order_id") @db.Uuid
+  payoutId String? @map("payout_id") @db.Uuid
+  /// Free text for the one case a human has to read: an adjustment.
+  note     String? @db.VarChar(200)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  shop   Shop    @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  order  Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  payout Payout? @relation(fields: [payoutId], references: [id], onDelete: SetNull)
+
+  // The balance query: every entry for one shop in one account.
+  @@index([shopId, account])
+  @@index([orderId])
+  @@map("ledger_entries")
+}
+
+enum PayoutStatus {
+  REQUESTED
+  PROCESSING
+  PAID
+  REJECTED
+
+  @@map("payout_status")
+}
+
+/// A shop asking for its available balance in cash.
+///
+/// The bank details are snapshotted rather than referenced, for the same reason an
+/// order snapshots its address: this is a record of where money was sent, and editing
+/// the payout account later must not rewrite it.
+model Payout {
+  id     String @id @db.Uuid
+  shopId String @map("shop_id") @db.Uuid
+  amount Int
+  status PayoutStatus @default(REQUESTED)
+
+  bankCode      String @map("bank_code") @db.VarChar(40)
+  accountNumber String @map("account_number") @db.VarChar(40)
+  accountName   String @map("account_name") @db.VarChar(120)
+
+  /// Why it was rejected, or the bank reference once it was sent.
+  note String? @db.VarChar(200)
+
+  requestedAt DateTime  @default(now()) @map("requested_at") @db.Timestamptz(3)
+  settledAt   DateTime? @map("settled_at") @db.Timestamptz(3)
+
+  shop   Shop          @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  ledger LedgerEntry[]
+
+  @@index([shopId, requestedAt])
+  @@index([status])
+  @@map("payouts")
 }

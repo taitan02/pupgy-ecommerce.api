@@ -38,7 +38,13 @@ const TRANSITIONS: Record<OrderStatus, { to: OrderStatus; by: Actor[] }[]> = {
     { to: 'CANCELLED', by: ['SELLER'] },
   ],
   SHIPPING: [{ to: 'DELIVERED', by: ['SELLER'] }],
-  DELIVERED: [],
+  DELIVERED: [
+    // The courier's claim is DELIVERED; the buyer's acceptance is COMPLETED, and that
+    // is what releases the shop's money. SYSTEM is here because most buyers never press
+    // the button, and a shop's money cannot sit in escrow because of that (ADR-015).
+    { to: 'COMPLETED', by: ['BUYER', 'SYSTEM'] },
+  ],
+  COMPLETED: [],
   CANCELLED: [],
 };
 
@@ -77,6 +83,7 @@ export function allowedTransitions(from: OrderStatus, actor: Actor, paid = false
 export const RESTOCKS_ON_CANCEL: OrderStatus[] = ['AWAITING_PAYMENT', 'PENDING', 'CONFIRMED'];
 
 const TIMESTAMP_COLUMN = {
+  COMPLETED: 'completedAt',
   // AWAITING_PAYMENT has no column: it is where a QR order starts, and `placedAt`
   // already records when.
   CONFIRMED: 'confirmedAt',

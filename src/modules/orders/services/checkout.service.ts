@@ -4,8 +4,8 @@ import { AppError } from '../../../common/errors/app-error.js';
 import { StorageService } from '../../../infra/storage/storage.service.js';
 import { CartRepository, type CartLineRow } from '../../cart/repositories/cart.repository.js';
 import { AddressRepository, type AddressRecord } from '../../addresses/repositories/address.repository.js';
-import { PaymentAccountRepository } from '../../payments/repositories/payment-account.repository.js';
 import { PaymentService } from '../../payments/services/payment.service.js';
+import { EscrowService } from '../../payments/services/escrow.service.js';
 import { CartItemIssue } from '../../cart/dto/cart.dto.js';
 import { evaluateLine, optionValuesOf } from '../../cart/services/availability.js';
 import { OrderRepository, OutOfStockError, type NewOrderLine } from '../repositories/order.repository.js';
@@ -32,8 +32,8 @@ export class CheckoutService {
     private readonly orders: OrderRepository,
     private readonly storage: StorageService,
     private readonly notifications: NotificationService,
-    private readonly paymentAccounts: PaymentAccountRepository,
     private readonly paymentService: PaymentService,
+    private readonly escrow: EscrowService,
   ) {}
 
   /**
@@ -68,7 +68,9 @@ export class CheckoutService {
       itemsSubtotal,
       shippingFee: SHIPPING_FLAT_FEE,
       total: itemsSubtotal + SHIPPING_FLAT_FEE,
-      paymentMethods: await this.methodsFor(dto.shopId),
+      // Both, always: the platform receives the money, so no shop configuration is
+      // needed to accept a transfer (ADR-015).
+      paymentMethods: ['COD', 'SEPAY_QR'],
       blocked: !address || items.some((item) => item.issue !== null),
     };
   }
@@ -102,12 +104,10 @@ export class CheckoutService {
       });
     }
 
-    // Checked before anything is written: a shop that has not configured SePay must
-    // not be able to receive a QR order, whatever the client sent.
+    // Every shop can be paid by transfer now: the money goes to the platform, not to
+    // the shop's own account (ADR-015). What a shop needs before it can be *paid out*
+    // is a bank account, and that is a separate question from taking the order.
     const byTransfer = dto.paymentMethod === 'SEPAY_QR';
-    if (byTransfer && !(await this.paymentAccounts.findActiveForShop(dto.shopId))) {
-      throw AppError.conflict('This shop does not accept bank transfer');
-    }
 
     const itemsSubtotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
     const lines: NewOrderLine[] = items.map((item) => ({
@@ -132,6 +132,9 @@ export class CheckoutService {
         shopId: dto.shopId,
         buyerId: userId,
         paymentMethod: byTransfer ? 'SEPAY_QR' : 'COD',
+        // Snapshotted at placement: changing the platform's rate must not rewrite what
+        // a shop was owed on an order placed last month.
+        commissionRate: this.escrow.currentRate(),
         status: byTransfer ? 'AWAITING_PAYMENT' : 'PENDING',
         recipientName: address.recipientName,
         phone: address.phone,
@@ -147,8 +150,8 @@ export class CheckoutService {
       });
 
       if (byTransfer) {
-        // The stock is already gone; this row is what gives it back if nobody pays.
-        await this.paymentService.open(order.id, order.shopId, order.total, order.code);
+        // The stock is already gone; this payment is what gives it back if nobody pays.
+        await this.paymentService.open({ buyerId: userId, orders: [order] });
       }
 
       // After the transaction, never inside it: a worker can pick a job up before the
@@ -187,12 +190,6 @@ export class CheckoutService {
       order: toOrderDto(order, this.storage, 'BUYER'),
       remainingCartItems: await this.cart.countLines(userId),
     };
-  }
-
-  /** COD everywhere; transfer only where the shop can actually receive one. */
-  private async methodsFor(shopId: string): Promise<('COD' | 'SEPAY_QR')[]> {
-    const account = await this.paymentAccounts.findActiveForShop(shopId);
-    return account ? ['COD', 'SEPAY_QR'] : ['COD'];
   }
 
   private async resolveAddress(userId: string, addressId?: string): Promise<AddressRecord | null> {

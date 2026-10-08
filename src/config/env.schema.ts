@@ -37,14 +37,25 @@ export const envSchema = z.object({
   /// Where uploaded files are readable from: the R2 public domain, or MinIO locally.
   S3_PUBLIC_BASE_URL: z.string().min(1),
 
-  /// 32 bytes, base64. Encrypts the per-shop SePay webhook secrets at rest (ADR-014).
-  /// Generate with: openssl rand -base64 32
-  /// Not the JWT secret and never reused as one — losing this means every merchant
-  /// re-enters their webhook secret, leaking it means every one must be rotated.
-  ENCRYPTION_KEY: z.string().min(1),
+  // Payments. One SePay account, belonging to the platform: buyers transfer to it and
+  // the money is held until an order completes (ADR-015).
+  SEPAY_BANK_CODE: z.string().default('Vietcombank'),
+  SEPAY_ACCOUNT_NUMBER: z.string().default('0010000000355'),
+  SEPAY_ACCOUNT_NAME: z.string().default('PUPGY JSC'),
+  /// The HMAC secret from the SePay webhook configuration. Empty disables the webhook
+  /// rather than accepting unsigned callbacks.
+  SEPAY_WEBHOOK_SECRET: z.string().default(''),
 
-  /// How long a QR order holds its stock before the sweeper cancels it.
+  /// How long a QR payment holds its stock before the sweeper cancels the orders.
   PAYMENT_EXPIRY_MINUTES: z.coerce.number().int().positive().default(15),
+
+  /// Platform commission, in basis points. 500 = 5%. Snapshotted onto every order at
+  /// placement, so changing it never rewrites what a shop was already owed.
+  COMMISSION_RATE_BPS: z.coerce.number().int().min(0).max(10_000).default(500),
+
+  /// Most buyers never press "received". Money cannot sit in escrow because of that,
+  /// so delivery starts a clock that releases it (ADR-015).
+  AUTO_RELEASE_DAYS: z.coerce.number().int().positive().default(3),
 
   // Mail. One transport everywhere: Mailpit locally, SendGrid's SMTP relay in
   // staging and production (username `apikey`, password = the API key). Using the

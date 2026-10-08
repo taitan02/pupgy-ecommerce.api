@@ -27,6 +27,8 @@ const ORDER_SELECT = {
   itemsSubtotal: true,
   shippingFee: true,
   total: true,
+  commissionRate: true,
+  completedAt: true,
   recipientName: true,
   phone: true,
   provinceName: true,
@@ -68,6 +70,8 @@ export interface NewOrder {
   shopId: string;
   buyerId: string;
   paymentMethod: 'COD' | 'SEPAY_QR';
+  /// Basis points, snapshotted so a later rate change is not retroactive (ADR-015).
+  commissionRate: number;
   /** COD orders start at PENDING; a QR order starts in AWAITING_PAYMENT with the
    *  stock already taken, and the expiry job is what releases it (ADR-014). */
   status: 'PENDING' | 'AWAITING_PAYMENT';
@@ -117,6 +121,7 @@ export class OrderRepository {
           shopId: order.shopId,
           buyerId: order.buyerId,
           paymentMethod: order.paymentMethod,
+          commissionRate: order.commissionRate,
           status: order.status,
           recipientName: order.recipientName,
           phone: order.phone,
@@ -307,6 +312,7 @@ export class OrderRepository {
       CONFIRMED: 0,
       SHIPPING: 0,
       DELIVERED: 0,
+      COMPLETED: 0,
       CANCELLED: 0,
     };
     for (const row of rows) counts[row.status] = row._count._all;

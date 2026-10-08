@@ -1,8 +1,33 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsOptional, IsString, Length, Matches, MaxLength } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+import { IsInt, IsString, Matches, MaxLength, Min } from 'class-validator';
+import { CursorQueryDto } from '../../../common/dto/cursor-page.dto.js';
 
-export class UpsertPaymentAccountDto {
-  @ApiProperty({ example: 'Vietcombank', description: "SePay's short bank name" })
+export class PaymentInstructionsDto {
+  @ApiProperty({ description: 'VietQR image to show the buyer' }) qrImageUrl!: string;
+  @ApiProperty({ example: 'Vietcombank' }) bankCode!: string;
+  @ApiProperty() accountNumber!: string;
+  @ApiProperty({ description: 'The platform, not the shop — funds are held until the order completes' })
+  accountName!: string;
+  @ApiProperty({ description: 'Integer VND — must match exactly' }) amount!: number;
+  @ApiProperty({ description: 'What the buyer must put in the transfer memo' })
+  reference!: string;
+  @ApiProperty({ format: 'date-time' }) expiresAt!: string;
+  @ApiProperty({ enum: ['PENDING', 'PAID', 'EXPIRED', 'CANCELLED'] }) status!: string;
+}
+
+/** SePay's documented success contract: HTTP 200/201 with this body, within 30s. */
+export class WebhookAckDto {
+  @ApiProperty({ example: true }) success!: boolean;
+}
+
+export class PayoutAccountDto {
+  @ApiProperty({ example: 'Vietcombank' }) bankCode!: string;
+  @ApiProperty({ description: 'Masked — only the last four digits' }) accountNumberMasked!: string;
+  @ApiProperty() accountName!: string;
+}
+
+export class UpsertPayoutAccountDto {
+  @ApiProperty({ example: 'Vietcombank' })
   @IsString()
   @MaxLength(40)
   bankCode!: string;
@@ -15,50 +40,66 @@ export class UpsertPaymentAccountDto {
   @IsString()
   @MaxLength(120)
   accountName!: string;
-
-  @ApiPropertyOptional({
-    minLength: 16,
-    description:
-      'The HMAC secret from SePay. Write-only: send it to set or rotate it, omit it to leave the stored one alone. It is never returned.',
-  })
-  @IsOptional()
-  @IsString()
-  @Length(16, 200)
-  webhookSecret?: string;
-
-  @ApiPropertyOptional({ default: true })
-  @IsOptional()
-  @IsBoolean()
-  isActive?: boolean;
 }
 
-export class PaymentAccountDto {
-  @ApiProperty() bankCode!: string;
-  @ApiProperty({ description: 'Masked — only the last four digits' }) accountNumberMasked!: string;
-  @ApiProperty() accountName!: string;
+export class ShopBalanceDto {
+  @ApiProperty({ description: 'Held until the orders behind it complete' }) pending!: number;
   @ApiProperty({
-    description: 'Paste this into SePay as the webhook URL. It identifies the shop, nothing more.',
+    description:
+      'Withdrawable. Can be negative: COD money never reaches the platform, so the commission on it is a debt.',
   })
-  webhookUrl!: string;
-  @ApiProperty({ description: 'Whether a secret has been stored. The secret itself is never sent back.' })
-  hasSecret!: boolean;
-  @ApiProperty() isActive!: boolean;
+  available!: number;
 }
 
-export class PaymentInstructionsDto {
-  @ApiProperty({ description: 'VietQR image to show the buyer' }) qrImageUrl!: string;
-  @ApiProperty({ example: 'Vietcombank' }) bankCode!: string;
-  @ApiProperty() accountNumber!: string;
+export class LedgerEntryDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty({ enum: ['SHOP_PENDING', 'SHOP_AVAILABLE'] }) account!: string;
+  @ApiProperty({ description: 'Signed integer VND' }) amount!: number;
+  @ApiProperty({
+    enum: [
+      'ORDER_PAID',
+      'ORDER_RELEASED',
+      'ORDER_REFUNDED',
+      'COD_COMMISSION_DUE',
+      'PAYOUT_RESERVED',
+      'PAYOUT_RETURNED',
+    ],
+  })
+  reason!: string;
+  @ApiProperty({ format: 'uuid', nullable: true, type: String }) orderId!: string | null;
+  @ApiProperty({ format: 'uuid', nullable: true, type: String }) payoutId!: string | null;
+  @ApiProperty({ nullable: true, type: String }) note!: string | null;
+  @ApiProperty({ format: 'date-time' }) createdAt!: string;
+}
+
+export class LedgerPageDto {
+  @ApiProperty({ type: [LedgerEntryDto] }) items!: LedgerEntryDto[];
+  @ApiProperty({ nullable: true, type: String }) nextCursor!: string | null;
+}
+
+export class PayoutDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty() amount!: number;
+  @ApiProperty({ enum: ['REQUESTED', 'PROCESSING', 'PAID', 'REJECTED'] }) status!: string;
+  @ApiProperty() bankCode!: string;
+  @ApiProperty({ description: 'Masked' }) accountNumberMasked!: string;
   @ApiProperty() accountName!: string;
-  @ApiProperty({ description: 'Integer VND — must match exactly' }) amount!: number;
-  @ApiProperty({ description: 'What the buyer must put in the transfer memo' })
-  reference!: string;
-  @ApiProperty({ format: 'date-time', description: 'After this the order is cancelled and restocked' })
-  expiresAt!: string;
-  @ApiProperty({ enum: ['PENDING', 'PAID', 'EXPIRED', 'CANCELLED'] }) status!: string;
+  @ApiProperty({ nullable: true, type: String }) note!: string | null;
+  @ApiProperty({ format: 'date-time' }) requestedAt!: string;
+  @ApiProperty({ format: 'date-time', nullable: true, type: String }) settledAt!: string | null;
 }
 
-/** SePay's documented success contract: HTTP 200/201 with this body, within 30s. */
-export class WebhookAckDto {
-  @ApiProperty({ example: true }) success!: boolean;
+export class PayoutPageDto {
+  @ApiProperty({ type: [PayoutDto] }) items!: PayoutDto[];
+  @ApiProperty({ nullable: true, type: String }) nextCursor!: string | null;
 }
+
+export class RequestPayoutDto {
+  @ApiProperty({ minimum: 50_000, description: 'Integer VND, at most the available balance' })
+  @IsInt()
+  @Min(1)
+  amount!: number;
+}
+
+export class FinanceQueryDto extends CursorQueryDto {}
+

@@ -1823,6 +1823,7 @@
                 "CONFIRMED",
                 "SHIPPING",
                 "DELIVERED",
+                "COMPLETED",
                 "CANCELLED"
               ]
             }
@@ -1953,6 +1954,56 @@
         ]
       }
     },
+    "/api/v1/storefront/orders/{id}/complete": {
+      "post": {
+        "description": "Releases the shop’s money from escrow, minus the platform commission.",
+        "operationId": "StorefrontOrderController_complete",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The order has not been delivered yet"
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Confirm the goods arrived",
+        "tags": [
+          "storefront/orders"
+        ]
+      }
+    },
     "/api/v1/storefront/orders/{id}/cancel": {
       "post": {
         "operationId": "StorefrontOrderController_cancel",
@@ -2056,6 +2107,7 @@
                 "CONFIRMED",
                 "SHIPPING",
                 "DELIVERED",
+                "COMPLETED",
                 "CANCELLED"
               ]
             }
@@ -2834,9 +2886,121 @@
         ]
       }
     },
-    "/api/v1/seller/payment-account": {
+    "/api/v1/seller/finance/balance": {
       "get": {
-        "operationId": "SellerPaymentController_get",
+        "operationId": "SellerFinanceController_balance",
+        "parameters": [
+          {
+            "name": "x-shop-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShopBalanceDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Held and withdrawable balance, summed from the ledger",
+        "tags": [
+          "seller/finance"
+        ]
+      }
+    },
+    "/api/v1/seller/finance/ledger": {
+      "get": {
+        "description": "Append-only. A correction appears as its own opposite entry, never as an edit.",
+        "operationId": "SellerFinanceController_ledger",
+        "parameters": [
+          {
+            "name": "x-shop-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Id of the last item from the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LedgerPageDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Every movement of money, newest first",
+        "tags": [
+          "seller/finance"
+        ]
+      }
+    },
+    "/api/v1/seller/finance/payout-account": {
+      "get": {
+        "operationId": "SellerFinanceController_payoutAccount",
         "parameters": [
           {
             "name": "x-shop-id",
@@ -2853,7 +3017,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PaymentAccountDto"
+                  "$ref": "#/components/schemas/PayoutAccountDto"
                 }
               }
             }
@@ -2874,14 +3038,13 @@
             "access-token": []
           }
         ],
-        "summary": "The shop’s bank details and webhook URL",
+        "summary": "Where payouts are sent",
         "tags": [
-          "seller/payments"
+          "seller/finance"
         ]
       },
       "put": {
-        "description": "The webhook secret is write-only: send it to set or rotate it, omit it to keep the stored one. It is never returned.",
-        "operationId": "SellerPaymentController_upsert",
+        "operationId": "SellerFinanceController_savePayoutAccount",
         "parameters": [
           {
             "name": "x-shop-id",
@@ -2897,7 +3060,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpsertPaymentAccountDto"
+                "$ref": "#/components/schemas/UpsertPayoutAccountDto"
               }
             }
           }
@@ -2908,7 +3071,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PaymentAccountDto"
+                  "$ref": "#/components/schemas/PayoutAccountDto"
                 }
               }
             }
@@ -2929,9 +3092,129 @@
             "access-token": []
           }
         ],
-        "summary": "Create or update it",
+        "summary": "Set or change the destination bank account",
         "tags": [
-          "seller/payments"
+          "seller/finance"
+        ]
+      }
+    },
+    "/api/v1/seller/finance/payouts": {
+      "get": {
+        "operationId": "SellerFinanceController_listPayouts",
+        "parameters": [
+          {
+            "name": "x-shop-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Id of the last item from the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayoutPageDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Past and pending withdrawals",
+        "tags": [
+          "seller/finance"
+        ]
+      },
+      "post": {
+        "description": "The amount leaves the available balance immediately, so requesting twice cannot be paid twice.",
+        "operationId": "SellerFinanceController_requestPayout",
+        "parameters": [
+          {
+            "name": "x-shop-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestPayoutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayoutDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Request a withdrawal",
+        "tags": [
+          "seller/finance"
         ]
       }
     }
@@ -4526,6 +4809,7 @@
               "CONFIRMED",
               "SHIPPING",
               "DELIVERED",
+              "COMPLETED",
               "CANCELLED"
             ]
           },
@@ -4586,6 +4870,7 @@
                 "CONFIRMED",
                 "SHIPPING",
                 "DELIVERED",
+                "COMPLETED",
                 "CANCELLED"
               ]
             }
@@ -4637,6 +4922,11 @@
             "format": "date-time",
             "nullable": true
           },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
           "cancelledAt": {
             "type": "string",
             "format": "date-time",
@@ -4668,6 +4958,7 @@
           "confirmedAt",
           "shippedAt",
           "deliveredAt",
+          "completedAt",
           "cancelledAt"
         ]
       },
@@ -4706,6 +4997,7 @@
               "CONFIRMED",
               "SHIPPING",
               "DELIVERED",
+              "COMPLETED",
               "CANCELLED"
             ]
           },
@@ -4766,6 +5058,7 @@
                 "CONFIRMED",
                 "SHIPPING",
                 "DELIVERED",
+                "COMPLETED",
                 "CANCELLED"
               ]
             }
@@ -4822,7 +5115,8 @@
             "type": "string"
           },
           "accountName": {
-            "type": "string"
+            "type": "string",
+            "description": "The platform, not the shop — funds are held until the order completes"
           },
           "amount": {
             "type": "number",
@@ -4834,8 +5128,7 @@
           },
           "expiresAt": {
             "type": "string",
-            "format": "date-time",
-            "description": "After this the order is cancelled and restocked"
+            "format": "date-time"
           },
           "status": {
             "type": "string",
@@ -4886,6 +5179,10 @@
           "delivered": {
             "type": "number"
           },
+          "completed": {
+            "type": "number",
+            "description": "Accepted by the buyer — escrow released"
+          },
           "cancelled": {
             "type": "number"
           }
@@ -4896,6 +5193,7 @@
           "confirmed",
           "shipping",
           "delivered",
+          "completed",
           "cancelled"
         ]
       },
@@ -5191,11 +5489,107 @@
           }
         }
       },
-      "PaymentAccountDto": {
+      "ShopBalanceDto": {
+        "type": "object",
+        "properties": {
+          "pending": {
+            "type": "number",
+            "description": "Held until the orders behind it complete"
+          },
+          "available": {
+            "type": "number",
+            "description": "Withdrawable. Can be negative: COD money never reaches the platform, so the commission on it is a debt."
+          }
+        },
+        "required": [
+          "pending",
+          "available"
+        ]
+      },
+      "LedgerEntryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "account": {
+            "type": "string",
+            "enum": [
+              "SHOP_PENDING",
+              "SHOP_AVAILABLE"
+            ]
+          },
+          "amount": {
+            "type": "number",
+            "description": "Signed integer VND"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "ORDER_PAID",
+              "ORDER_RELEASED",
+              "ORDER_REFUNDED",
+              "COD_COMMISSION_DUE",
+              "PAYOUT_RESERVED",
+              "PAYOUT_RETURNED"
+            ]
+          },
+          "orderId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "payoutId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "account",
+          "amount",
+          "reason",
+          "orderId",
+          "payoutId",
+          "note",
+          "createdAt"
+        ]
+      },
+      "LedgerPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LedgerEntryDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "PayoutAccountDto": {
         "type": "object",
         "properties": {
           "bankCode": {
-            "type": "string"
+            "type": "string",
+            "example": "Vietcombank"
           },
           "accountNumberMasked": {
             "type": "string",
@@ -5203,35 +5597,20 @@
           },
           "accountName": {
             "type": "string"
-          },
-          "webhookUrl": {
-            "type": "string",
-            "description": "Paste this into SePay as the webhook URL. It identifies the shop, nothing more."
-          },
-          "hasSecret": {
-            "type": "boolean",
-            "description": "Whether a secret has been stored. The secret itself is never sent back."
-          },
-          "isActive": {
-            "type": "boolean"
           }
         },
         "required": [
           "bankCode",
           "accountNumberMasked",
-          "accountName",
-          "webhookUrl",
-          "hasSecret",
-          "isActive"
+          "accountName"
         ]
       },
-      "UpsertPaymentAccountDto": {
+      "UpsertPayoutAccountDto": {
         "type": "object",
         "properties": {
           "bankCode": {
             "type": "string",
-            "example": "Vietcombank",
-            "description": "SePay's short bank name"
+            "example": "Vietcombank"
           },
           "accountNumber": {
             "type": "string",
@@ -5240,21 +5619,99 @@
           "accountName": {
             "type": "string",
             "example": "NGUYEN VAN A"
-          },
-          "webhookSecret": {
-            "type": "string",
-            "minLength": 16,
-            "description": "The HMAC secret from SePay. Write-only: send it to set or rotate it, omit it to leave the stored one alone. It is never returned."
-          },
-          "isActive": {
-            "type": "boolean",
-            "default": true
           }
         },
         "required": [
           "bankCode",
           "accountNumber",
           "accountName"
+        ]
+      },
+      "PayoutDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "REQUESTED",
+              "PROCESSING",
+              "PAID",
+              "REJECTED"
+            ]
+          },
+          "bankCode": {
+            "type": "string"
+          },
+          "accountNumberMasked": {
+            "type": "string",
+            "description": "Masked"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "settledAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "amount",
+          "status",
+          "bankCode",
+          "accountNumberMasked",
+          "accountName",
+          "note",
+          "requestedAt",
+          "settledAt"
+        ]
+      },
+      "PayoutPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PayoutDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "RequestPayoutDto": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "minimum": 50000,
+            "description": "Integer VND, at most the available balance"
+          }
+        },
+        "required": [
+          "amount"
         ]
       },
       "ProblemDto": {

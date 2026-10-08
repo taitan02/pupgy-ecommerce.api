@@ -27,6 +27,7 @@ export function toOrderDto(row: OrderRow, storage: StorageService, actor: Actor)
     confirmedAt: row.confirmedAt?.toISOString() ?? null,
     shippedAt: row.shippedAt?.toISOString() ?? null,
     deliveredAt: row.deliveredAt?.toISOString() ?? null,
+    completedAt: row.completedAt?.toISOString() ?? null,
     cancelledAt: row.cancelledAt?.toISOString() ?? null,
   });
 }

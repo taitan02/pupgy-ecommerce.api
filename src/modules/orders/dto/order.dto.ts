@@ -17,6 +17,7 @@ export enum OrderStatusDto {
   CONFIRMED = 'CONFIRMED',
   SHIPPING = 'SHIPPING',
   DELIVERED = 'DELIVERED',
+  COMPLETED = 'COMPLETED',
   CANCELLED = 'CANCELLED',
 }
 
@@ -80,6 +81,7 @@ export class OrderDto extends OrderListItemDto {
   @ApiProperty({ format: 'date-time', nullable: true, type: String }) confirmedAt!: string | null;
   @ApiProperty({ format: 'date-time', nullable: true, type: String }) shippedAt!: string | null;
   @ApiProperty({ format: 'date-time', nullable: true, type: String }) deliveredAt!: string | null;
+  @ApiProperty({ format: 'date-time', nullable: true, type: String }) completedAt!: string | null;
   @ApiProperty({ format: 'date-time', nullable: true, type: String }) cancelledAt!: string | null;
 }
 
@@ -96,6 +98,7 @@ export class OrderSummaryDto {
   @ApiProperty() confirmed!: number;
   @ApiProperty() shipping!: number;
   @ApiProperty() delivered!: number;
+  @ApiProperty({ description: 'Accepted by the buyer — escrow released' }) completed!: number;
   @ApiProperty() cancelled!: number;
 }
 

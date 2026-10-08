@@ -86,6 +86,21 @@ export class StorefrontOrderController {
     return this.orders.paymentFor(user.id, id);
   }
 
+  @Post('orders/:id/complete')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Confirm the goods arrived',
+    description: 'Releases the shop’s money from escrow, minus the platform commission.',
+  })
+  @ApiOkResponse({ type: OrderDto })
+  @ApiConflictResponse({ description: 'The order has not been delivered yet' })
+  complete(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<OrderDto> {
+    return this.orders.completeAsBuyer(user.id, id);
+  }
+
   @Post('orders/:id/cancel')
   @HttpCode(200)
   @ApiOperation({ summary: 'Cancel, while the shop has not confirmed yet' })
