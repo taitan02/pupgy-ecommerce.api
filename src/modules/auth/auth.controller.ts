@@ -1,5 +1,12 @@
 import { Body, Controller, Get, HttpCode, Post, Req, Res } from '@nestjs/common';
-import { ApiBody, ApiOkResponse, ApiOperation, ApiTags, ApiTooManyRequestsResponse } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+  ApiTooManyRequestsResponse,
+  getSchemaPath,
+} from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
 import { AuthService } from './services/auth.service.js';
@@ -18,14 +25,19 @@ import { CurrentUser, Public } from '../../common/decorators/auth.decorators.js'
 import { RateLimit } from '../../common/rate-limit/rate-limit.decorator.js';
 import { AppError } from '../../common/errors/app-error.js';
 import { ErrorCode } from '../../common/errors/error-codes.js';
+import { ProblemDto } from '../../common/dto/problem.dto.js';
 import type { AuthenticatedUser } from './auth.types.js';
 import type { IssuedTokens } from './services/token.service.js';
 import type { TokenAudience } from '../../generated/prisma/enums.js';
 import type { Env } from '../../config/env.schema.js';
 
 @ApiTags('auth')
+// Spelled out instead of `type: ProblemDto`, which Swagger renders as plain
+// application/json — a 429 that claims an empty body makes generated clients type
+// `error` as undefined, and the UI then reports a throttle as a wrong password.
 @ApiTooManyRequestsResponse({
   description: 'Rate limit exceeded. The Retry-After header says how long to wait.',
+  content: { 'application/problem+json': { schema: { $ref: getSchemaPath(ProblemDto) } } },
 })
 @Controller('auth')
 export class AuthController {

@@ -109,7 +109,14 @@
             }
           },
           "429": {
-            "description": "Rate limit exceeded. The Retry-After header says how long to wait."
+            "description": "Rate limit exceeded. The Retry-After header says how long to wait.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
           },
           "default": {
             "description": "Request failed. RFC 9457 problem document with a stable `code`.",
@@ -154,7 +161,14 @@
             }
           },
           "429": {
-            "description": "Rate limit exceeded. The Retry-After header says how long to wait."
+            "description": "Rate limit exceeded. The Retry-After header says how long to wait.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
           },
           "default": {
             "description": "Request failed. RFC 9457 problem document with a stable `code`.",
@@ -193,7 +207,14 @@
             "description": ""
           },
           "429": {
-            "description": "Rate limit exceeded. The Retry-After header says how long to wait."
+            "description": "Rate limit exceeded. The Retry-After header says how long to wait.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
           },
           "default": {
             "description": "Request failed. RFC 9457 problem document with a stable `code`.",
@@ -232,7 +253,14 @@
             "description": ""
           },
           "429": {
-            "description": "Rate limit exceeded. The Retry-After header says how long to wait."
+            "description": "Rate limit exceeded. The Retry-After header says how long to wait.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
           },
           "default": {
             "description": "Request failed. RFC 9457 problem document with a stable `code`.",
@@ -277,7 +305,14 @@
             }
           },
           "429": {
-            "description": "Rate limit exceeded. The Retry-After header says how long to wait."
+            "description": "Rate limit exceeded. The Retry-After header says how long to wait.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
           },
           "default": {
             "description": "Request failed. RFC 9457 problem document with a stable `code`.",
@@ -315,7 +350,14 @@
             "description": ""
           },
           "429": {
-            "description": "Rate limit exceeded. The Retry-After header says how long to wait."
+            "description": "Rate limit exceeded. The Retry-After header says how long to wait.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
           },
           "default": {
             "description": "Request failed. RFC 9457 problem document with a stable `code`.",
@@ -350,7 +392,14 @@
             }
           },
           "429": {
-            "description": "Rate limit exceeded. The Retry-After header says how long to wait."
+            "description": "Rate limit exceeded. The Retry-After header says how long to wait.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
           },
           "default": {
             "description": "Request failed. RFC 9457 problem document with a stable `code`.",
