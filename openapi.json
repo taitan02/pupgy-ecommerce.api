@@ -3266,6 +3266,241 @@
           "seller/finance"
         ]
       }
+    },
+    "/api/v1/storefront/ai/conversations": {
+      "post": {
+        "operationId": "StorefrontAiController_start",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartConversationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Open a chat thread",
+        "tags": [
+          "storefront/ai"
+        ]
+      },
+      "get": {
+        "operationId": "StorefrontAiController_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Id of the last item from the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationPageDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "The buyer’s own threads, most recently active first",
+        "tags": [
+          "storefront/ai"
+        ]
+      }
+    },
+    "/api/v1/storefront/ai/conversations/{id}/messages": {
+      "get": {
+        "operationId": "StorefrontAiController_messages",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ConversationMessageDto"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Everything said in one thread",
+        "tags": [
+          "storefront/ai"
+        ]
+      },
+      "post": {
+        "operationId": "StorefrontAiController_send",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "SSE frames: `delta` for each chunk of text, `done` with the saved message id, `error` when the answer could not be finished."
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Ask, and stream the answer (text/event-stream)",
+        "tags": [
+          "storefront/ai"
+        ]
+      }
+    },
+    "/api/v1/storefront/ai/quota": {
+      "get": {
+        "operationId": "StorefrontAiController_usage",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiQuotaDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Request failed. RFC 9457 problem document with a stable `code`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "What is left of today’s allowance",
+        "tags": [
+          "storefront/ai"
+        ]
+      }
     }
   },
   "info": {
@@ -5761,6 +5996,154 @@
         },
         "required": [
           "amount"
+        ]
+      },
+      "StartConversationDto": {
+        "type": "object",
+        "properties": {
+          "shopId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The shop the buyer is looking at. Context only — never a permission."
+          }
+        }
+      },
+      "ConversationDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "shopId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true,
+            "description": "The opening question, trimmed"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastMessageAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "shopId",
+          "title",
+          "createdAt",
+          "lastMessageAt"
+        ]
+      },
+      "ConversationPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConversationDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "ConversationMessageDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "USER",
+              "ASSISTANT"
+            ]
+          },
+          "content": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string",
+            "nullable": true,
+            "description": "Which model wrote it"
+          },
+          "stopReason": {
+            "type": "string",
+            "enum": [
+              "END_TURN",
+              "MAX_TOKENS",
+              "TOOL_USE",
+              "REFUSAL",
+              "ABORTED",
+              "FAILED"
+            ],
+            "nullable": true,
+            "description": "MAX_TOKENS means the answer was cut off; ABORTED means nobody was listening"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "content",
+          "model",
+          "stopReason",
+          "createdAt"
+        ]
+      },
+      "AiQuotaDto": {
+        "type": "object",
+        "properties": {
+          "messagesUsed": {
+            "type": "number",
+            "description": "Messages used today, in Vietnam's day"
+          },
+          "messageLimit": {
+            "type": "number"
+          },
+          "tokensUsed": {
+            "type": "number"
+          },
+          "tokenLimit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "messagesUsed",
+          "messageLimit",
+          "tokensUsed",
+          "tokenLimit"
+        ]
+      },
+      "SendMessageDto": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "content"
         ]
       },
       "ProblemDto": {

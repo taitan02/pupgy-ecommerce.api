@@ -114,6 +114,29 @@ export const envSchema = z.object({
   BULL_BOARD_USER: z.string().default('admin'),
   BULL_BOARD_PASSWORD: z.string().optional(),
 
+  // AI. Empty disables every AI endpoint rather than letting it fail per request:
+  // a 503 at the door is honest, a provider error 40 seconds into a stream is not.
+  ANTHROPIC_API_KEY: z.string().default(''),
+  /// Overrides where the SDK sends requests: a gateway, or a local stand-in during a
+  /// UI check. Empty means Anthropic's own endpoint. Passed to the client explicitly
+  /// rather than left to ANTHROPIC_BASE_URL, which the SDK reads from the real
+  /// process environment — and a value that only lives in .env never gets there.
+  ANTHROPIC_BASE_URL: z.string().default(''),
+  AI_MODEL: z.string().default('claude-opus-5-5'),
+  /// Thinking depth and token spend. `low` is right for shop chat: answers come from
+  /// tool results, not from reasoning, and latency is what a shopper feels.
+  AI_EFFORT: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).default('low'),
+  /// Hard ceiling per answer. The model is not told about it, so this is a cost stop,
+  /// not a length instruction — keep it generous enough not to cut answers off.
+  AI_MAX_OUTPUT_TOKENS: z.coerce.number().int().positive().default(2_048),
+  /// How many past messages are replayed as context. The API is stateless, so every
+  /// message in the window is paid for again on every turn.
+  AI_HISTORY_WINDOW: z.coerce.number().int().positive().default(20),
+  // Per-user daily quotas. Two limits because they fail differently: a message cap
+  // stops a bored user, a token cap stops one long abusive conversation.
+  AI_DAILY_MESSAGE_QUOTA: z.coerce.number().int().positive().default(50),
+  AI_DAILY_TOKEN_QUOTA: z.coerce.number().int().positive().default(200_000),
+
   SWAGGER_ENABLED: z
     .enum(['true', 'false'])
     .default('true')

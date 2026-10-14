@@ -58,6 +58,8 @@ model User {
   orders      Order[]
   payments    Payment[]
   passwordResets PasswordResetToken[]
+  conversations  Conversation[]
+  aiUsage        AiUsageRecord[]
 
   @@map("users")
 }
@@ -106,6 +108,8 @@ model Shop {
   payoutAccount ShopPayoutAccount?
   ledger        LedgerEntry[]
   payouts       Payout[]
+  conversations Conversation[]
+  aiUsage       AiUsageRecord[]
 
   @@map("shops")
 }
@@ -751,4 +755,122 @@ model Payout {
   @@index([shopId, requestedAt])
   @@index([status])
   @@map("payouts")
+}
+
+enum AiMessageRole {
+  USER
+  ASSISTANT
+
+  @@map("ai_message_role")
+}
+
+/// Why the model stopped. Stored because a truncated answer and a refused one look
+/// identical in the text and have to be told apart after the fact.
+enum AiStopReason {
+  END_TURN
+  MAX_TOKENS
+  TOOL_USE
+  REFUSAL
+  /// The browser went away mid-stream. The tokens were still generated and billed.
+  ABORTED
+  FAILED
+
+  @@map("ai_stop_reason")
+}
+
+/// Which part of the product spent the money. One model, many callers: chat today,
+/// ingestion and summarisation later, and a bill nobody can attribute is a bill
+/// nobody can cut.
+enum AiFeature {
+  SHOP_CHAT
+
+  @@map("ai_feature")
+}
+
+/// One AI chat thread belonging to one buyer.
+model Conversation {
+  id     String  @id @db.Uuid
+  userId String  @map("user_id") @db.Uuid
+  /// Set when the chat was opened from a shop or product page. The orchestrator uses
+  /// it as context; it is never taken from anything the model says (ADR-016).
+  shopId String? @map("shop_id") @db.Uuid
+  /// First question, trimmed. Written once so a conversation list needs no AI call.
+  title  String? @db.VarChar(120)
+
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastMessageAt DateTime @default(now()) @map("last_message_at") @db.Timestamptz(3)
+
+  user     User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shop     Shop?                 @relation(fields: [shopId], references: [id], onDelete: SetNull)
+  messages ConversationMessage[]
+  usage    AiUsageRecord[]
+
+  // The conversation list: one buyer's threads, newest activity first.
+  @@index([userId, lastMessageAt])
+  @@map("conversations")
+}
+
+model ConversationMessage {
+  id             String        @id @db.Uuid
+  conversationId String        @map("conversation_id") @db.Uuid
+  role           AiMessageRole
+  content        String
+
+  /// Null on user messages. Kept per message, not per conversation: the model can
+  /// change between turns and an answer has to say which one wrote it.
+  model      String?       @db.VarChar(60)
+  stopReason AiStopReason? @map("stop_reason")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  conversation Conversation   @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  usage        AiUsageRecord?
+
+  @@index([conversationId, createdAt])
+  @@map("conversation_messages")
+}
+
+/// What one model call cost. Append-only, like LedgerEntry: a usage row is never
+/// corrected, and the quota is the sum of rows rather than a counter someone trusts
+/// (ADR-016). The Redis counter in front of it is a cache, not the truth.
+model AiUsageRecord {
+  id      String    @id @db.Uuid
+  feature AiFeature
+  userId  String    @map("user_id") @db.Uuid
+  /// Which shop's context the call was about — the per-shop cost of AI support.
+  shopId  String?   @map("shop_id") @db.Uuid
+
+  conversationId String? @map("conversation_id") @db.Uuid
+  /// The assistant message this call produced. One call, one message.
+  messageId      String? @unique @map("message_id") @db.Uuid
+
+  model String @db.VarChar(60)
+
+  inputTokens      Int @map("input_tokens")
+  outputTokens     Int @map("output_tokens")
+  /// Cached prefix served back, billed at a fraction of the input rate.
+  cacheReadTokens  Int @default(0) @map("cache_read_tokens")
+  cacheWriteTokens Int @default(0) @map("cache_write_tokens")
+
+  /// Millionths of a USD, integer — the same reason prices are integer VND. Computed
+  /// from a rate table kept in code, so a later price change cannot silently rewrite
+  /// what last month cost.
+  costMicroUsd Int @map("cost_micro_usd")
+  latencyMs    Int @map("latency_ms")
+
+  stopReason AiStopReason @map("stop_reason")
+  /// Set when the call failed, so failures can be counted without parsing messages.
+  errorCode  String?      @map("error_code") @db.VarChar(40)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shop         Shop?                @relation(fields: [shopId], references: [id], onDelete: SetNull)
+  conversation Conversation?        @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  message      ConversationMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  // The quota question: everything one user spent since a point in time.
+  @@index([userId, createdAt])
+  @@index([shopId, createdAt])
+  @@map("ai_usage_records")
 }

@@ -11,21 +11,33 @@ import type { Env } from '../config/env.schema.js';
 
 export const API_PREFIX = 'api/v1';
 
+export const NEST_OPTIONS = {
+  logger: new NestPinoLogger(),
+  bufferLogs: true,
+  // Keeps the untouched request bytes on `request.rawBody`. The SePay webhook
+  // signature covers exactly what was sent, and JSON that has been parsed and
+  // re-serialised is not it — key order, whitespace and Unicode escaping all move,
+  // and this payload carries Vietnamese text (ADR-014).
+  rawBody: true,
+} as const;
+
 /**
  * Shared by the HTTP server and by the OpenAPI generator script, so the committed
  * spec always describes the app as it is actually configured.
  */
 export async function createApp(): Promise<NestExpressApplication> {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    logger: new NestPinoLogger(),
-    bufferLogs: true,
-    // Keeps the untouched request bytes on `request.rawBody`. The SePay webhook
-    // signature covers exactly what was sent, and JSON that has been parsed and
-    // re-serialised is not it — key order, whitespace and Unicode escaping all move,
-    // and this payload carries Vietnamese text (ADR-014).
-    rawBody: true,
-  });
+  return configureApp(
+    await NestFactory.create<NestExpressApplication>(AppModule, NEST_OPTIONS),
+  );
+}
 
+/**
+ * Everything applied on top of the Nest app itself. Split out so a test that has to
+ * replace a provider can build the container its own way and still run against the
+ * same pipes, filter and CORS rules the server uses — a test app that validates
+ * differently proves nothing about the real one.
+ */
+export function configureApp(app: NestExpressApplication): NestExpressApplication {
   const config = app.get<ConfigService<Env, true>>(ConfigService);
 
   app.setGlobalPrefix(API_PREFIX);
