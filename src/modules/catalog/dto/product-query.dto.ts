@@ -1,7 +1,14 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, IsUUID, MaxLength, Min } from 'class-validator';
 import { CursorQueryDto } from '../../../common/dto/cursor-page.dto.js';
 import { ProductStatusDto } from './product.dto.js';
+
+export enum StorefrontSortDto {
+  NEWEST = 'newest',
+  PRICE_ASC = 'price_asc',
+  PRICE_DESC = 'price_desc',
+}
 
 export enum ProductSortDto {
   UPDATED = 'updated',
@@ -59,4 +66,34 @@ export class StorefrontProductQueryDto extends CursorQueryDto {
   @IsString()
   @MaxLength(140)
   shopSlug?: string;
+
+  @ApiPropertyOptional({ enum: StorefrontSortDto, default: StorefrontSortDto.NEWEST })
+  @IsOptional()
+  @IsEnum(StorefrontSortDto)
+  sort?: StorefrontSortDto;
+
+  @ApiPropertyOptional({
+    example: 150_000,
+    description: 'Integer VND. A product matches when any of its SKUs falls in the range.',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  minPrice?: number;
+
+  @ApiPropertyOptional({ example: 500_000, description: 'Integer VND' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  maxPrice?: number;
+
+  @ApiPropertyOptional({ description: 'Keep only products with at least one sellable SKU in stock' })
+  @IsOptional()
+  // The pipe's implicit conversion has already turned "true" into true by the time
+  // this runs; the string arms are for the "1" that hand-built links carry.
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
+  @IsBoolean()
+  inStock?: boolean;
 }

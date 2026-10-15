@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infra/prisma/prisma.service.js';
+import { categoryCountQuery } from './public-catalog.sql.js';
 
 export interface CategoryRow {
   id: string;
@@ -29,6 +30,28 @@ export class CategoryRepository {
 
   findBySlug(slug: string): Promise<{ id: string } | null> {
     return this.prisma.category.findFirst({ where: { slug, isActive: true }, select: { id: true } });
+  }
+
+  /**
+   * The category plus its active children. A category page lists everything below it,
+   * so landing on a parent shows products even though products attach to leaves.
+   */
+  async findBranchBySlug(slug: string): Promise<{ id: string; ids: string[] } | null> {
+    const category = await this.prisma.category.findFirst({
+      where: { slug, isActive: true },
+      select: { id: true, children: { where: { isActive: true }, select: { id: true } } },
+    });
+    if (!category) return null;
+
+    return { id: category.id, ids: [category.id, ...category.children.map((child) => child.id)] };
+  }
+
+  /** Active products per category id, for the subcategory counts and the nav. */
+  async countPublicProducts(): Promise<Map<string, number>> {
+    const rows = await this.prisma.$queryRaw<{ category_id: string; product_count: number }[]>(
+      categoryCountQuery(),
+    );
+    return new Map(rows.map((row) => [row.category_id, row.product_count]));
   }
 
   findAllActive(): Promise<CategoryRow[]> {

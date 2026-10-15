@@ -15,6 +15,13 @@ export class CategoryResponseDto {
   @ApiProperty({ example: 'dien-thoai', description: 'URL segment, unique platform-wide' })
   slug!: string;
 
+  @ApiProperty({
+    example: 96,
+    description:
+      'Active products in this category and its children. Catalog-wide: it does not narrow with the price or stock filters.',
+  })
+  productCount!: number;
+
   @ApiProperty({ type: () => [CategoryResponseDto], description: 'Direct children, ordered' })
   children!: CategoryResponseDto[];
 }

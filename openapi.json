@@ -873,6 +873,49 @@
               "example": "tai-store",
               "type": "string"
             }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "newest",
+              "type": "string",
+              "enum": [
+                "newest",
+                "price_asc",
+                "price_desc"
+              ]
+            }
+          },
+          {
+            "name": "minPrice",
+            "required": false,
+            "in": "query",
+            "description": "Integer VND. A product matches when any of its SKUs falls in the range.",
+            "schema": {
+              "example": 150000,
+              "type": "number"
+            }
+          },
+          {
+            "name": "maxPrice",
+            "required": false,
+            "in": "query",
+            "description": "Integer VND",
+            "schema": {
+              "example": 500000,
+              "type": "number"
+            }
+          },
+          {
+            "name": "inStock",
+            "required": false,
+            "in": "query",
+            "description": "Keep only products with at least one sellable SKU in stock",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -3944,6 +3987,11 @@
             "example": "dien-thoai",
             "description": "URL segment, unique platform-wide"
           },
+          "productCount": {
+            "type": "number",
+            "example": 96,
+            "description": "Active products in this category and its children. Catalog-wide: it does not narrow with the price or stock filters."
+          },
           "children": {
             "description": "Direct children, ordered",
             "type": "array",
@@ -3956,6 +4004,7 @@
           "id",
           "name",
           "slug",
+          "productCount",
           "children"
         ]
       },
@@ -4059,11 +4108,23 @@
           "nextCursor": {
             "type": "string",
             "nullable": true
+          },
+          "total": {
+            "type": "number",
+            "example": 96,
+            "description": "Products matching the filters, ignoring the cursor"
+          },
+          "shopCount": {
+            "type": "number",
+            "example": 31,
+            "description": "Distinct shops among those products"
           }
         },
         "required": [
           "items",
-          "nextCursor"
+          "nextCursor",
+          "total",
+          "shopCount"
         ]
       },
       "ProductOptionResponseDto": {

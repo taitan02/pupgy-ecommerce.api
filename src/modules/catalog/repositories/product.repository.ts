@@ -2,6 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infra/prisma/prisma.service.js';
 import { RequestContext } from '../../../common/context/request-context.js';
 import type { ProductStatus } from '../../../generated/prisma/enums.js';
+import {
+  publicCountQuery,
+  publicPageQuery,
+  type PublicListFilters,
+  type PublicSort,
+} from './public-catalog.sql.js';
 
 /** Everything a product page needs, in one query. */
 const DETAIL_SELECT = {
@@ -223,39 +229,27 @@ export class ProductRepository {
     });
   }
 
-  /**
-   * Ids matching a Vietnamese search, accent-insensitive in both directions: the
-   * query and the stored name both go through f_unaccent, so "ao khoac" finds
-   * "Áo khoác" and vice versa.
-   *
-   * Raw SQL because Prisma cannot express a function call in a WHERE clause. Ordering
-   * stays id DESC rather than by relevance so search shares the one cursor model;
-   * ranking can come later, measured.
-   */
-  async searchPublicIds(params: { query: string; cursor?: string; limit: number }): Promise<string[]> {
-    const pattern = `%${params.query.trim()}%`;
-
-    const rows = await this.prisma.$queryRaw<{ id: string }[]>`
-      SELECT p.id
-      FROM products p
-      JOIN shops s ON s.id = p.shop_id
-      WHERE p.status = 'ACTIVE'
-        AND s.status = 'ACTIVE'
-        AND f_unaccent(p.name) ILIKE f_unaccent(${pattern})
-        AND (${params.cursor ?? null}::uuid IS NULL OR p.id < ${params.cursor ?? null}::uuid)
-      ORDER BY p.id DESC
-      LIMIT ${params.limit + 1}
-    `;
-
+  /** Ids for one page of the public catalog, already in display order. */
+  async listPublicIds(params: {
+    filters: PublicListFilters;
+    sort: PublicSort;
+    cursor?: string;
+    limit: number;
+  }): Promise<string[]> {
+    const rows = await this.prisma.$queryRaw<{ id: string }[]>(publicPageQuery(params));
     return rows.map((row) => row.id);
   }
 
+  async countPublic(filters: PublicListFilters): Promise<{ total: number; shopCount: number }> {
+    const [row] = await this.prisma.$queryRaw<{ total: number; shop_count: number }[]>(
+      publicCountQuery(filters),
+    );
+    return { total: row?.total ?? 0, shopCount: row?.shop_count ?? 0 };
+  }
+
+  /** Hydration only: the caller holds the order, because the id list defines it. */
   listPublicByIds(ids: string[]) {
-    return this.prisma.product.findMany({
-      where: { id: { in: ids } },
-      orderBy: { id: 'desc' },
-      select: LIST_SELECT,
-    });
+    return this.prisma.product.findMany({ where: { id: { in: ids } }, select: LIST_SELECT });
   }
 
 
@@ -269,19 +263,6 @@ export class ProductRepository {
     });
   }
 
-  listPublic(params: { cursor?: string; limit: number; categoryId?: string; shopSlug?: string }) {
-    return this.prisma.product.findMany({
-      where: {
-        status: 'ACTIVE',
-        shop: { status: 'ACTIVE', slug: params.shopSlug },
-        categoryId: params.categoryId,
-      },
-      orderBy: { id: 'desc' },
-      take: params.limit + 1,
-      ...(params.cursor ? { cursor: { id: params.cursor }, skip: 1 } : {}),
-      select: LIST_SELECT,
-    });
-  }
 }
 
 function orderByFor(sort: 'updated' | 'created' | 'name' | undefined) {

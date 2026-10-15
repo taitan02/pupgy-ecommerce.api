@@ -15,9 +15,11 @@ import type {
   ProductDetailDto,
   ProductListItemDto,
   StorefrontProductDetailDto,
-  StorefrontProductListItemDto,
+  StorefrontProductListPageDto,
 } from '../dto/product-response.dto.js';
 import type { ProductStatus } from '../../../generated/prisma/enums.js';
+import type { PublicListFilters } from '../repositories/public-catalog.sql.js';
+import { StorefrontSortDto } from '../dto/product-query.dto.js';
 
 @Injectable()
 export class ProductService {
@@ -196,27 +198,50 @@ export class ProductService {
     categorySlug?: string;
     shopSlug?: string;
     q?: string;
-  }): Promise<CursorPageDto<StorefrontProductListItemDto>> {
-    let categoryId: string | undefined;
+    sort?: StorefrontSortDto;
+    minPrice?: number;
+    maxPrice?: number;
+    inStock?: boolean;
+  }): Promise<StorefrontProductListPageDto> {
+    let categoryIds: string[] | undefined;
     if (params.categorySlug) {
-      const category = await this.categories.findBySlug(params.categorySlug);
-      if (!category) throw AppError.notFound('Category not found');
-      categoryId = category.id;
+      const branch = await this.categories.findBranchBySlug(params.categorySlug);
+      if (!branch) throw AppError.notFound('Category not found');
+      categoryIds = branch.ids;
     }
 
-    const query = params.q?.trim();
-    const rows = query
-      ? await this.products.listPublicByIds(
-          await this.products.searchPublicIds({ query, cursor: params.cursor, limit: params.limit }),
-        )
-      : await this.products.listPublic({ ...params, categoryId });
-    const items = rows.map((row) => ({
-      ...this.toListItem(row),
-      shopName: row.shop.name,
-      shopSlug: row.shop.slug,
-    }));
+    const filters: PublicListFilters = {
+      categoryIds,
+      shopSlug: params.shopSlug,
+      query: params.q?.trim() || undefined,
+      minPrice: params.minPrice,
+      maxPrice: params.maxPrice,
+      inStockOnly: params.inStock,
+    };
 
-    return toCursorPage(items, params.limit);
+    const [ids, counts] = await Promise.all([
+      this.products.listPublicIds({
+        filters,
+        sort: params.sort ?? StorefrontSortDto.NEWEST,
+        cursor: params.cursor,
+        limit: params.limit,
+      }),
+      this.products.countPublic(filters),
+    ]);
+
+    const rows = await this.products.listPublicByIds(ids);
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    // Hydration comes back unordered: the id list is what carries the sort.
+    const items = ids
+      .map((id) => byId.get(id))
+      .filter((row): row is (typeof rows)[number] => row !== undefined)
+      .map((row) => ({
+        ...this.toListItem(row),
+        shopName: row.shop.name,
+        shopSlug: row.shop.slug,
+      }));
+
+    return { ...toCursorPage(items, params.limit), ...counts };
   }
 
   private toDetail(product: ProductRow) {

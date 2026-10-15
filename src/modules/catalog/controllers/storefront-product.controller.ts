@@ -3,11 +3,9 @@ import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ProductService } from '../services/product.service.js';
 import {
   StorefrontProductDetailDto,
-  StorefrontProductListItemDto,
   StorefrontProductListPageDto,
 } from '../dto/product-response.dto.js';
 import { StorefrontProductQueryDto } from '../dto/product-query.dto.js';
-import type { CursorPageDto } from '../../../common/dto/cursor-page.dto.js';
 import { Public } from '../../../common/decorators/auth.decorators.js';
 
 /**
@@ -24,14 +22,8 @@ export class StorefrontProductController {
   @Get()
   @ApiOperation({ summary: 'Browse products across all shops' })
   @ApiOkResponse({ type: StorefrontProductListPageDto })
-  list(@Query() query: StorefrontProductQueryDto): Promise<CursorPageDto<StorefrontProductListItemDto>> {
-    return this.products.listPublic({
-      cursor: query.cursor,
-      limit: query.limit,
-      categorySlug: query.categorySlug,
-      shopSlug: query.shopSlug,
-      q: query.q,
-    });
+  list(@Query() query: StorefrontProductQueryDto): Promise<StorefrontProductListPageDto> {
+    return this.products.listPublic(query);
   }
 
   @Get(':id')

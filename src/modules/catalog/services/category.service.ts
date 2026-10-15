@@ -13,15 +13,25 @@ export class CategoryService {
    * place to add caching — not a second query pattern.
    */
   async getTree(): Promise<CategoryResponseDto[]> {
-    const rows = await this.categories.findAllActive();
-    return buildTree(rows);
+    const [rows, counts] = await Promise.all([
+      this.categories.findAllActive(),
+      this.categories.countPublicProducts(),
+    ]);
+
+    return buildTree(rows, counts);
   }
 }
 
-function buildTree(rows: CategoryRow[]): CategoryResponseDto[] {
+function buildTree(rows: CategoryRow[], counts: Map<string, number>): CategoryResponseDto[] {
   const byId = new Map<string, CategoryResponseDto>();
   for (const row of rows) {
-    byId.set(row.id, { id: row.id, name: row.name, slug: row.slug, children: [] });
+    byId.set(row.id, {
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      productCount: counts.get(row.id) ?? 0,
+      children: [],
+    });
   }
 
   const roots: CategoryResponseDto[] = [];
@@ -34,6 +44,12 @@ function buildTree(rows: CategoryRow[]): CategoryResponseDto[] {
     } else {
       byId.get(row.parentId)?.children.push(node);
     }
+  }
+
+  // Products hang off leaves, so a parent's own count is the sum of its branch. Done
+  // after the tree is linked, over roots only: the depth is two and fixed by seed.
+  for (const root of roots) {
+    root.productCount += root.children.reduce((total, child) => total + child.productCount, 0);
   }
 
   return roots;

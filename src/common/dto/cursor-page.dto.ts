@@ -32,8 +32,17 @@ export class CursorPageDto<T> {
   nextCursor!: string | null;
 }
 
-/** Takes one extra row to decide whether another page exists, then drops it. */
-export function toCursorPage<T extends { id: string }>(rows: T[], limit: number): CursorPageDto<T> {
+/**
+ * Takes one extra row to decide whether another page exists, then drops it.
+ *
+ * The return type is structural rather than CursorPageDto: callers that add fields of
+ * their own (a total, a facet) spread this result, and spreading a class instance
+ * drops its prototype.
+ */
+export function toCursorPage<T extends { id: string }>(
+  rows: T[],
+  limit: number,
+): { items: T[]; nextCursor: string | null } {
   const hasMore = rows.length > limit;
   const items = hasMore ? rows.slice(0, limit) : rows;
   return { items, nextCursor: hasMore ? items.at(-1)!.id : null };

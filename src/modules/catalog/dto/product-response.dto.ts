@@ -77,9 +77,19 @@ export class ProductListPageDto {
   @ApiProperty({ nullable: true, type: String }) nextCursor!: string | null;
 }
 
+/**
+ * The storefront page carries the two totals the listing header states ("96 sản phẩm
+ * từ 31 shop") and the "đang xem 8 / 96" line under the grid. They cost one count
+ * query over the same filters, and without them a cursor-paginated list cannot tell
+ * the shopper how much is left.
+ */
 export class StorefrontProductListPageDto {
   @ApiProperty({ type: [StorefrontProductListItemDto] }) items!: StorefrontProductListItemDto[];
   @ApiProperty({ nullable: true, type: String }) nextCursor!: string | null;
+  @ApiProperty({ example: 96, description: 'Products matching the filters, ignoring the cursor' })
+  total!: number;
+  @ApiProperty({ example: 31, description: 'Distinct shops among those products' })
+  shopCount!: number;
 }
 
 /** Tab counters for the product list screen. */
