@@ -1,0 +1,19 @@
+# Everything the build does not read. Keeping this tight matters twice over: it cuts
+# the context Docker uploads, and it makes sure a local .env can never end up baked
+# into an image that gets pushed to a registry.
+node_modules
+dist
+.git
+.github
+.env
+.env.*
+!.env.example
+*.log
+coverage
+test
+*.spec.ts
+*.e2e-spec.ts
+vitest.config*.ts
+.vscode
+.idea
+README.md

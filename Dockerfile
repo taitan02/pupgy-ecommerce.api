@@ -1,38 +1,69 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1.7
 
-FROM node:22-alpine AS base
-ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH
+# Four stages, so the image that ships carries only what runs.
+#
+# Building needs TypeScript, the Nest CLI and the Prisma generator; running needs
+# dist/, production node_modules and Node. Keeping them in one stage would ship the
+# whole toolchain and every .ts file to a 1 GB VPS.
+
+FROM node:22-slim AS base
+ENV PNPM_HOME=/pnpm
+ENV PATH=$PNPM_HOME:$PATH
+# The pnpm version comes from package.json's packageManager field, so the image and a
+# developer's machine resolve the same tree.
 RUN corepack enable
+# Prisma's schema engine links against OpenSSL, which the slim image does not carry.
+# Without it the CLI guesses a version and migrations fail in ways that read as
+# unrelated errors.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
+
 
 FROM base AS deps
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
-FROM base AS build
-COPY --from=deps /app/node_modules ./node_modules
+
+FROM deps AS build
 COPY . .
-# The Prisma client is generated code, not source: it must be produced inside the
-# image so it matches this platform's engine.
-RUN pnpm prisma generate && pnpm build
+# prisma.config.ts resolves DATABASE_URL the moment it loads, so every prisma command
+# needs one present — including `generate`, which never opens a connection. This value
+# is thrown away with the stage; the real URL comes from the environment at runtime.
+ENV DATABASE_URL=postgresql://build:build@localhost:5432/build
+# `nest build` (tsc), never esbuild: esbuild drops emitDecoratorMetadata, which leaves
+# Nest unable to resolve constructor types and kills the container at boot with
+# "Cannot read properties of undefined (reading 'get')".
+RUN pnpm prisma:generate && pnpm build
+
 
 FROM base AS prod-deps
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile --prod
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod --frozen-lockfile
 
-FROM node:22-alpine AS runner
-WORKDIR /app
+
+FROM base AS runner
 ENV NODE_ENV=production
-# Never run the app as root, even in a container.
+
+COPY --from=prod-deps /app/node_modules ./node_modules
+# The generated Prisma client is compiled along with the rest of src/, so it arrives
+# inside dist/ rather than in node_modules/.prisma as it would by default.
+COPY --from=build /app/dist ./dist
+# Migrations run in production, so the schema, the migration history and the config
+# that supplies DATABASE_URL all have to be in the image. Prisma 7 refuses a `url` in
+# the datasource block, so prisma.config.ts is the only place that URL can come from.
+COPY prisma ./prisma
+COPY prisma.config.ts package.json ./
+
+# Never root: a process that only serves HTTP has no reason to be able to write to
+# its own image.
 USER node
 
-COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
-COPY --from=build --chown=node:node /app/dist ./dist
-COPY --from=build --chown=node:node /app/prisma ./prisma
-COPY --from=build --chown=node:node /app/prisma.config.ts ./prisma.config.ts
-COPY --chown=node:node package.json ./
-
 EXPOSE 3000
-# Migrations are NOT run here: they are a separate deploy step, so a rolling restart
-# cannot have two containers migrating the same database at once.
-CMD ["node", "dist/main"]
+
+# Node 22 has global fetch, so the probe needs no curl in the image.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:3000/api/v1/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
+CMD ["node", "dist/main.js"]

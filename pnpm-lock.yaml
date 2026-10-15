@@ -65,6 +65,9 @@ importers:
       cookie-parser:
         specifier: ^1.4.7
         version: 1.4.7
+      dotenv:
+        specifier: ^18.0.4
+        version: 18.0.4
       helmet:
         specifier: ^8.3.0
         version: 8.3.0
@@ -80,6 +83,9 @@ importers:
       pino:
         specifier: ^10.3.1
         version: 10.3.1
+      prisma:
+        specifier: 7.10.0
+        version: 7.10.0(@types/react@19.3.0)(magicast@0.5.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -123,9 +129,6 @@ importers:
       '@vitest/coverage-v8':
         specifier: ^4.1.2
         version: 4.1.11(vitest@4.1.11)
-      dotenv:
-        specifier: ^18.0.4
-        version: 18.0.4
       oxlint:
         specifier: ^1.58.0
         version: 1.85.0(oxlint-tsgolint@7.0.2003)
@@ -138,9 +141,6 @@ importers:
       prettier:
         specifier: ^3.4.2
         version: 3.9.9
-      prisma:
-        specifier: 7.10.0
-        version: 7.10.0(@types/react@19.3.0)(magicast@0.5.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
       source-map-support:
         specifier: ^0.5.21
         version: 0.5.21

@@ -107,3 +107,47 @@ jobs:
       # regenerated fails here rather than surprising a frontend team later.
       - name: Check OpenAPI contract is up to date
         run: pnpm openapi:check
+
+  # Only after verify is green, and only on main: an image in the registry is a
+  # deployable artefact, so it should never exist for code that failed its tests.
+  # Building here rather than on the VPS is what keeps a 1 GB server viable — the
+  # server only ever pulls.
+  image:
+    needs: verify
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          # Two tags per build: `latest` for the normal deploy, and the commit SHA so
+          # a rollback has something precise to point at.
+          tags: |
+            type=raw,value=latest
+            type=sha,format=long,prefix=
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # The VPS is amd64; building one architecture keeps the job under a minute.
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
