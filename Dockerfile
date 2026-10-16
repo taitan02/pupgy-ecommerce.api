@@ -50,9 +50,14 @@ COPY --from=prod-deps /app/node_modules ./node_modules
 # The generated Prisma client is compiled along with the rest of src/, so it arrives
 # inside dist/ rather than in node_modules/.prisma as it would by default.
 COPY --from=build /app/dist ./dist
-# Migrations run in production, so the schema, the migration history and the config
-# that supplies DATABASE_URL all have to be in the image. Prisma 7 refuses a `url` in
-# the datasource block, so prisma.config.ts is the only place that URL can come from.
+# Migrations run from this image during a deploy, so the schema, the migration history
+# and the config that supplies DATABASE_URL all have to be in it. Prisma 7 refuses a
+# `url` in the datasource block, so prisma.config.ts is the only place that URL can
+# come from.
+#
+# The CLI costs nothing extra to ship: @prisma/client declares `prisma` as a peer
+# dependency, so a production install pulls its tree in either way. Keeping it out of
+# the image only removed the node_modules/.bin link, not the 40 MB behind it.
 COPY prisma ./prisma
 COPY prisma.config.ts package.json ./
 
